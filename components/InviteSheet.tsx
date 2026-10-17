@@ -9,8 +9,8 @@ import { handle } from "@/lib/validation";
 import { CopyIcon, ShareIcon } from "./icons";
 import { Sheet } from "./Sheet";
 
-// The invite screen (Milestones v0.1; Clout City Clarifications 7): a personal link, a share
-// button and the crew count. Rewards unlock when the town opens.
+// The invite screen, "Create your band" (Milestones v0.1; Clout City Clarifications 7; owner, Oct 17: invited
+// friends are your band): a personal link, a share button and the count. Rewards unlock when the town opens.
 export function InviteSheet({
   open,
   onClose,
@@ -43,7 +43,7 @@ export function InviteSheet({
   }
 
   async function share() {
-    const text = "I'm starting a band in Clout City: Hollywood Music. Claim your name before the town opens.";
+    const text = "Join my band in Clout City: Hollywood Music. Claim your name before the town opens.";
     if (navigator.share) {
       try {
         await navigator.share({ title: "Clout City: Hollywood Music", text, url: link });
@@ -56,15 +56,15 @@ export function InviteSheet({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} label="Invite your Crew" tall>
+    <Sheet open={open} onClose={onClose} label="Create your band" tall>
       <div className="stack-24">
         <div className="stack-4" style={{ paddingRight: 44 }}>
           <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-            <h2 className="display-lg" style={{ margin: 0 }}>Invite your Crew</h2>
+            <h2 className="display-lg" style={{ margin: 0 }}>Create your band</h2>
             <span className="body-strong" style={{ whiteSpace: "nowrap" }}>{progress.shown} of {size} joined</span>
           </div>
           <p className="subtext" style={{ margin: "4px 0 0" }}>
-            Nobody gets famous alone. Somebody has to hold the phone. Everyone who signs up through your link joins your crew.
+            Nobody gets famous alone. Somebody has to hold the tambourine. Everyone who signs up through your link joins your band.
           </p>
         </div>
 
@@ -85,7 +85,7 @@ export function InviteSheet({
         </div>
 
         <div className="stack-8">
-          <span className="title">Your crew</span>
+          <span className="title">Your band</span>
           <div style={{ height: 8, borderRadius: 999, background: "var(--chip-off)", overflow: "hidden" }} role="progressbar" aria-valuemin={0} aria-valuemax={size} aria-valuenow={progress.shown}>
             <div style={{ width: `${progress.ratio * 100}%`, height: "100%", background: "var(--spotlight-400)", borderRadius: 999, transition: "width .4s ease-out" }} />
           </div>
@@ -103,7 +103,7 @@ export function InviteSheet({
                 ))}
               </div>
               <p className="title" style={{ margin: 0 }}>Nobody yet</p>
-              <p className="subtext" style={{ margin: "4px 0 0" }}>A crew of one is a solo act. Send that link.</p>
+              <p className="subtext" style={{ margin: "4px 0 0" }}>A band of one is a solo act. Send that link.</p>
             </div>
           ) : (
             crew.map((m) => {
@@ -128,5 +128,5 @@ export function InviteSheet({
   );
 }
 
-/** Flat, soft colors for the empty crew seats (Monument Valley pastels). */
+/** Flat, soft colors for the empty band seats (Monument Valley pastels). */
 const SEAT_COLORS = ["#F7B7C8", "#B9D8F7", "#C9E8C4", "#F9D9A8", "#A8DCD9"];

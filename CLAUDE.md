@@ -21,7 +21,8 @@ music tabloid. Sister game to Clout City NYC (`internova0x-stack/project-clout-c
 ## How we build
 - Port Clout City's modules (from `project-clout-city`) and change only what the Hollywood documents and the
   owner's decisions change. Renames: clout → fame, Queens → Echo Flats, boroughs → districts, club events → club
-  nights, gigs → brand deals, Gigs app → Deals app. C$ and Crew keep their names.
+  nights, gigs → brand deals, Gigs app → Deals app. C$ keeps its name. Players see "band" for their invited friends
+  ("Create your band", owner, Oct 17); code, types and tables still say `crew`.
 - One step per pull request, with its Vercel preview and what to test on a phone. Show a preview or mockup
   before building anything visual.
 - Player data is permanent from day one: change the schema only with a new migration file.
