@@ -3,10 +3,10 @@
 // signs glow and monuments are uplit. Everything that changes at night registers in a Themed.
 
 import {
-  AdditiveBlending, BoxGeometry, CanvasTexture, CapsuleGeometry, CircleGeometry, Color, ConeGeometry, CylinderGeometry, DoubleSide, Float32BufferAttribute, Group,
+  AdditiveBlending, BoxGeometry, CanvasTexture, CapsuleGeometry, CircleGeometry, Color, ConeGeometry, CylinderGeometry, DoubleSide, ExtrudeGeometry, Float32BufferAttribute, Group,
   IcosahedronGeometry, Vector3,
   type Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, type Object3D, PlaneGeometry, RepeatWrapping,
-  SphereGeometry, SRGBColorSpace, TorusGeometry,
+  Shape, SphereGeometry, SRGBColorSpace, TorusGeometry,
 } from "three";
 import type { LandmarkKind } from "@/lib/map/landmarks";
 
@@ -554,14 +554,45 @@ function haloDome(t: Themed): Group {
 // ---------------------------------------------------------------------------
 // The CLOUTWOOD letters: giant white block letters on the hillside (original lettering, never the real sign)
 // ---------------------------------------------------------------------------
-const LETTERS: Record<string, string[]> = {
-  C: ["0111", "1000", "1000", "1000", "1000", "1000", "0111"],
-  L: ["1000", "1000", "1000", "1000", "1000", "1000", "1111"],
-  O: ["0110", "1001", "1001", "1001", "1001", "1001", "0110"],
-  U: ["1001", "1001", "1001", "1001", "1001", "1001", "0110"],
-  T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
-  W: ["10001", "10001", "10001", "10101", "10101", "11011", "10001"],
-  D: ["1110", "1001", "1001", "1001", "1001", "1001", "1110"],
+// Each letter is drawn with solid strokes (straight bars and smooth curves) so the word reads from across the
+// map; pixel blocks blurred together at a distance. Units are meters, origin at the letter's bottom left.
+const LETTER_H = 17;
+const STROKE = 3.4;
+const LETTER_DEPTH = 1.2;
+
+/** A straight stroke from one point to another. */
+function bar(x1: number, y1: number, x2: number, y2: number, mat: Material): Mesh {
+  const len = Math.hypot(x2 - x1, y2 - y1) + STROKE;
+  const m = new Mesh(new BoxGeometry(len, STROKE, LETTER_DEPTH), mat);
+  m.rotation.z = Math.atan2(y2 - y1, x2 - x1);
+  return at(m, (x1 + x2) / 2, (y1 + y2) / 2, 0);
+}
+
+/** A curved stroke along an ellipse (center, radii to the stroke's outer edge), from angle a0 to a1 (radians). */
+function arc(cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, mat: Material): Mesh {
+  const shape = new Shape();
+  shape.absellipse(cx, cy, rx, ry, a0, a1, false, 0);
+  shape.absellipse(cx, cy, rx - STROKE, ry - STROKE, a1, a0, true, 0);
+  return new Mesh(new ExtrudeGeometry(shape, { depth: LETTER_DEPTH, bevelEnabled: false, curveSegments: 24 }), mat);
+}
+
+/** A letter drawn as one solid outline (for strokes that meet at sharp angles, like the W). */
+function outline(points: [number, number][], mat: Material): Mesh {
+  const shape = new Shape();
+  points.forEach(([x, y], i) => (i ? shape.lineTo(x, y) : shape.moveTo(x, y)));
+  return new Mesh(new ExtrudeGeometry(shape, { depth: LETTER_DEPTH, bevelEnabled: false }), mat);
+}
+
+const PI = Math.PI;
+const H = LETTER_H, S2 = STROKE / 2;
+const LETTERS: Record<string, { w: number; draw: (m: Material) => Mesh[] }> = {
+  C: { w: 12, draw: m => [arc(6, H / 2, 6, H / 2, PI * 0.28, PI * 1.72, m)] },
+  L: { w: 10, draw: m => [bar(S2, S2, S2, H - S2, m), bar(S2, S2, 10 - S2, S2, m)] },
+  O: { w: 12, draw: m => [arc(6, H / 2, 6, H / 2, 0, PI * 2, m)] },
+  U: { w: 12, draw: m => [bar(S2, 6, S2, H - S2, m), bar(12 - S2, 6, 12 - S2, H - S2, m), arc(6, 6, 6, 6, PI, PI * 2, m)] },
+  T: { w: 12, draw: m => [bar(S2, H - S2, 12 - S2, H - S2, m), bar(6, S2, 6, H - S2, m)] },
+  W: { w: 16, draw: m => [outline([[0, H], [3.4, H], [5.4, 6.2], [7, 12.6], [9, 12.6], [10.6, 6.2], [12.6, H], [16, H], [13.2, 0], [10, 0], [8, 8], [6, 0], [2.8, 0]], m)] },
+  D: { w: 12, draw: m => [bar(S2, S2, S2, H - S2, m), bar(S2, S2, 4, S2, m), bar(S2, H - S2, 4, H - S2, m), arc(4, H / 2, 8, H / 2, -PI / 2, PI / 2, m)] },
 };
 
 function cloutwoodSign(t: Themed): Group {
@@ -577,21 +608,16 @@ function cloutwoodSign(t: Themed): Group {
   }
   // The letters: white by day; at night bright as a lit sign (basic glow), so they read across the dark hills.
   const white = glowing(t, "#FFFFFF", "#FFFFFF", 2.6, 0.35);
-  const cell = 2.4;
   const word = "CLOUTWOOD";
-  const gap = cell * 1.2;
-  const total = [...word].reduce((acc, ch) => acc + LETTERS[ch][0].length * cell + gap, -gap);
+  const gap = 3;
+  const total = [...word].reduce((acc, ch) => acc + LETTERS[ch].w + gap, -gap);
   let x = -total / 2;
   const letters = new Group();
   for (const ch of word) {
-    const rows = LETTERS[ch];
-    rows.forEach((row, ri) => {
-      [...row].forEach((on, ci) => {
-        if (on !== "1") return;
-        letters.add(at(new Mesh(new BoxGeometry(cell, cell, 1.2), white), x + ci * cell + cell / 2, (rows.length - ri - 0.5) * cell, 0));
-      });
-    });
-    x += rows[0].length * cell + gap;
+    const letter = new Group();
+    letter.add(...LETTERS[ch].draw(white));
+    letters.add(at(letter, x, 0, 0));
+    x += LETTERS[ch].w + gap;
   }
   // Upright on the slope, facing the camera, raised on short legs like a real hillside sign.
   // Clear of the slope (the hill's surface is about 20 m up here), so no row sinks into it.
