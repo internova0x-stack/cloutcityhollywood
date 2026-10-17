@@ -2069,3 +2069,31 @@ button.rank-chip::after { content:"›"; margin-left:2px; opacity:.6; }
   .show-callout.show { animation:callout-fade 1.2s linear forwards; }
 }
 @keyframes callout-fade { 0%, 80% { opacity:1; } 100% { opacity:0; } }
+
+/* ---- The illustrated Echo Flats board (Design C46 to C48) ---- */
+.imap { position:absolute; inset:0; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; background:#EBDDC4; cursor:grab; }
+.imap-board { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; }
+.imap.animate .imap-board, .imap-layer.animate > * { transition:transform .3s ease-out, left .3s ease-out, top .3s ease-out; }
+.imap-art { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; transition:opacity 2s ease-in-out; }
+/* Locked districts sit under soft, slowly drifting clouds (C48). */
+.imap-clouds { position:absolute; border-radius:48px; background:radial-gradient(closest-side, rgba(255,250,240,.94), rgba(255,250,240,.75) 70%, transparent); filter:blur(2px); animation:imap-drift 18s ease-in-out infinite alternate; }
+.imap-clouds.night { background:radial-gradient(closest-side, rgba(42,37,48,.94), rgba(42,37,48,.8) 70%, transparent); }
+@keyframes imap-drift { from { transform:translateX(-10px); } to { transform:translateX(10px); } }
+.imap-layer { position:absolute; inset:0; pointer-events:none; }
+.imap-layer > * { pointer-events:auto; }
+.imap-lock { position:absolute; transform:translate(-50%,-50%); white-space:nowrap; border:0; border-top:2px dotted var(--marquee-bulb); padding:4px 10px; border-radius:var(--r-pill); background:rgba(20,17,26,.72); color:var(--text-on-dark); font:700 11px/14px var(--font-ui); text-align:center; }
+.imap-lock small { display:block; font-weight:500; opacity:.7; }
+.imap-tile { position:absolute; transform:translate(-50%,-50%); width:28px; height:28px; display:grid; place-items:center; padding:0; font-size:15px; border-radius:9px; background:rgba(20,17,26,.72); border:1px solid rgba(255,246,224,.22); }
+.imap-tile.venue { border:2px solid var(--spotlight-400); }
+.imap-plate { position:absolute; transform:translateX(-50%); white-space:nowrap; display:flex; align-items:center; gap:5px; height:24px; padding:0 10px 0 4px; border:0; border-radius:var(--r-pill); background:rgba(20,17,26,.72); color:var(--text-on-dark); font:600 12px/1 var(--font-ui); }
+.imap-plate-emoji { width:16px; height:16px; display:grid; place-items:center; font-size:11px; border-radius:6px; background:rgba(255,246,224,.12); }
+/* Venues get a marquee plate: a row of bulbs, the name, and a status line (C47). */
+.imap-marquee { position:absolute; transform:translateX(-50%); white-space:nowrap; display:grid; gap:1px; padding:5px 10px 5px; border:0; border-radius:8px; background:var(--night-900); color:var(--text-on-dark); text-align:center; }
+.imap-marquee i { display:block; height:3px; margin:-2px -5px 3px; background:radial-gradient(circle, var(--marquee-bulb) 0 1px, transparent 1.5px) 0 0/6px 3px; }
+.imap-marquee b { font:700 13px/15px var(--font-label); letter-spacing:.06em; text-transform:uppercase; }
+.imap-marquee span { font:500 10px/12px var(--font-ui); opacity:.75; }
+.imap-zoom { position:absolute; z-index:21; right:max(12px, env(safe-area-inset-right,0px)); top:calc(156px + var(--safe-top)); width:40px; height:40px; border-radius:var(--r-pill); border:0; font:600 22px/1 var(--font-ui); color:var(--text-1); box-shadow:var(--elev-2); }
+@media (prefers-reduced-motion: reduce) {
+  .imap-clouds { animation:none; }
+  .imap-art { transition:none; }
+}

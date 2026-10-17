@@ -39,15 +39,18 @@ for owner approval when v0.3 is built.
 
 ## Map
 
-**Same map style as Clout City NYC** (owner, Oct 17), not the hand-illustrated board in the Concept Note,
-Clarifications §3 and Design C46 to C49: real streets on MapLibre, 3D landmark models for places, day and
-night themes, moving traffic, and locked districts shaded over.
+**The contained, illustrated board** (owner, Oct 17, later the same day), as the Concept Note, Clarifications §3
+and Design C46 to C49 describe it (Lagos Life style). This reverses the earlier "same map style as Clout City NYC"
+decision: no real streets, no MapLibre.
 
-- **Echo Flats** sits on the real streets of Echo Park and Silver Lake, Los Angeles. Every place name stays invented.
-- **The Halo Dome**: an original dome on its own lot in the Elysian Park hills, always lit, locked. It doesn't copy the real stadium there.
-- **The CLOUTWOOD letters**: on an Elysian Park hillside facing the town. Never Mount Lee or the real sign's lettering.
-- **Locked districts**: Starline Boulevard (Hollywood Boulevard), Neon Row (the Sunset Strip), Canyon Heights
-  (the Hollywood Hills), the Studio Lot (Burbank), the Pier District (the beach towns).
+- **A city grid** (owner, Oct 17): Echo Flats is twelve equal blocks on a regular street grid, one building per
+  block set back from the street, with Echo Boulevard through the middle. Every name stays invented.
+- **The art** is a v0.1 placeholder generated in code (`lib/map/board.ts`, written to `public/map/` by
+  `npm run gen:board`); real illustrated art replaces the two files later without code changes.
+- **Around the town**: the CLOUTWOOD hill above (original lettering, never the real sign), the Halo Dome on the far
+  edge (always lit, locked), and the locked districts under clouds: Starline Boulevard, Neon Row, Canyon Heights,
+  the Studio Lot and the Pier District.
+- **Later**: decorative vehicles on the roads and the player's marker (C47).
 
 ## Songs
 
