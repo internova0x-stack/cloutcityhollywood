@@ -38,12 +38,12 @@ export interface Spot {
 const DAY = {
   sky: ["#FFE3CC", "#FFD3B5"], ground: "#EBDDC4", park: "#B7D59A", parkDark: "#8FBF76", road: "#D2C8B8",
   roadLine: "#FFFFFF", water: "#8FD0E6", sand: "#F3E3BE", hill: "#A9CC8C", hillDark: "#86B46F",
-  glass: "#9FC3E0", shadow: "rgba(60,40,30,.16)", outline: "rgba(40,30,30,.18)", palm: "#5E9A58", trunk: "#9C7A54",
+  glass: "#9FC3E0", sidewalk: "#F5EBD9", shadow: "rgba(60,40,30,.16)", outline: "rgba(40,30,30,.18)", palm: "#5E9A58", trunk: "#9C7A54",
 };
 const NIGHT = {
   sky: ["#16233F", "#2A2550"], ground: "#25202D", park: "#1F2A24", parkDark: "#18221C", road: "#332D3A",
   roadLine: "rgba(255,194,26,.45)", water: "#14304A", sand: "#3A3340", hill: "#22302A", hillDark: "#1A2621",
-  glass: "#2A2530", shadow: "rgba(0,0,0,.35)", outline: "rgba(0,0,0,.35)", palm: "#2F4A33", trunk: "#4A3C30",
+  glass: "#2A2530", sidewalk: "#302A38", shadow: "rgba(0,0,0,.35)", outline: "rgba(0,0,0,.35)", palm: "#2F4A33", trunk: "#4A3C30",
 };
 
 /** Small deterministic random, so the board draws the same every time. */
@@ -52,38 +52,46 @@ function rand(seed: number): number {
   return s - Math.floor(s);
 }
 
+/**
+ * Echo Flats is a regular city grid (owner, Oct 17: more space between buildings, on a grid): streets every
+ * 180 units each way, so every block is the same 150-unit square with one building set back from the street.
+ */
+const GRID = { cols: [180, 360, 540], rows: [315, 495, 675, 855], block: 150, road: 30 };
+
 const ROADS = {
-  /** Horizontal roads: [y, x from, x to]. */
-  h: [[430, 150, 750], [640, 0, 900], [900, 150, 750]] as [number, number, number][],
-  /** Vertical roads: [x, y from, y to]. */
-  v: [[300, 270, 1060], [600, 270, 1060], [450, 640, 1080]] as [number, number, number][],
-  width: 30,
+  /** Horizontal streets: [y, x from, x to]. Echo Boulevard (y 660) runs the full width into the districts. */
+  h: [[300, 165, 735], [480, 165, 735], [660, 0, 900], [840, 165, 735], [1020, 165, 735]] as [number, number, number][],
+  /** Vertical streets: [x, y from, y to]. */
+  v: [[165, 285, 1035], [345, 285, 1035], [525, 285, 1035], [705, 285, 1035]] as [number, number, number][],
+  width: GRID.road,
 };
 
 const B = (x: number, y: number, w: number, d: number, h: number, kind: Kind, wall: string, roof: string, place?: string): Building =>
   ({ x, y, w, d, h, kind, wall, roof, place });
 
-/** Echo Flats: the places (v0.1 shows the venues and homes as places; the rest are scenery until they open). */
+/** One building in a grid block (column 0 to 2, row 0 to 3), centred and set back with a front yard. */
+function inBlock(col: number, row: number, w: number, d: number, h: number, kind: Kind, wall: string, roof: string, place?: string): Building {
+  const bx = GRID.cols[col], by = GRID.rows[row];
+  return B(bx + (GRID.block - w) / 2, by + 108 - d, w, d, h, kind, wall, roof, place);
+}
+
+/** Echo Flats, block by block (v0.1 shows the venues and homes as places; the rest are scenery until they open). */
 const BUILDINGS: Building[] = [
-  // North of Echo Boulevard
-  B(318, 540, 112, 54, 40, "cafe", "#F6C9A8", "#E07A5F", "the-grind"),
-  B(466, 532, 116, 60, 48, "divebar", "#7A5C58", "#4B3B3A", "rusty-amp"),
-  B(170, 515, 110, 62, 64, "loft", "#BFD7E8", "#7FA6C2", "laundromat-loft"),
-  B(620, 486, 110, 40, 30, "shop", "#E8B4B8", "#B5656F"),
-  B(620, 560, 110, 52, 36, "diner", "#F2F2EE", "#E05A5A"),
-  // South of Echo Boulevard
-  B(318, 678, 116, 78, 74, "theater", "#C24A4A", "#7E2E35", "the-marquee"),
-  B(620, 676, 112, 66, 56, "club", "#3A3345", "#24202C", "the-basement"),
-  B(170, 682, 112, 64, 52, "studio", "#D9CFE8", "#9A8CB8"),
-  B(466, 690, 116, 58, 96, "tower", "#E3D7C6", "#A9927A"),
-  B(170, 790, 112, 56, 40, "precinct", "#D3DDE6", "#5F7A94"),
-  B(620, 790, 112, 54, 34, "generic", "#F1D6A6", "#C79A55"),
-  // South of Vine-alley road
-  B(170, 940, 104, 58, 44, "house", "#F7D9B5", "#C46B4E", "band-house"),
-  B(470, 942, 118, 58, 34, "bungalow", "#CFE3D2", "#6E9C7A", "garage-bungalow"),
-  B(318, 946, 112, 52, 28, "generic", "#F0C9B6", "#B97A6A"),
-  B(620, 944, 110, 56, 50, "generic", "#E7E0D2", "#9E9484"),
-  B(560, 878, 34, 16, 14, "metro", "#2F7BEA", "#1E5BB8"),
+  // Row 0: Lookout Park (no building), a guitar shop, a market
+  inBlock(1, 0, 100, 44, 34, "shop", "#E8B4B8", "#B5656F"),
+  inBlock(2, 0, 104, 44, 30, "market", "#DDEBD3", "#5E9A58"),
+  // Row 1: north side of Echo Boulevard
+  inBlock(0, 1, 100, 50, 56, "loft", "#BFD7E8", "#7FA6C2", "laundromat-loft"),
+  inBlock(1, 1, 104, 48, 40, "cafe", "#F6C9A8", "#E07A5F", "the-grind"),
+  inBlock(2, 1, 104, 50, 46, "divebar", "#7A5C58", "#4B3B3A", "rusty-amp"),
+  // Row 2: south side of Echo Boulevard
+  inBlock(0, 2, 100, 50, 44, "studio", "#D9CFE8", "#9A8CB8"),
+  inBlock(1, 2, 112, 56, 58, "theater", "#C24A4A", "#7E2E35", "the-marquee"),
+  inBlock(2, 2, 104, 54, 50, "club", "#3A3345", "#24202C", "the-basement"),
+  // Row 3
+  inBlock(0, 3, 96, 48, 40, "house", "#F7D9B5", "#C46B4E", "band-house"),
+  inBlock(1, 3, 100, 46, 34, "diner", "#F2F2EE", "#E05A5A"),
+  inBlock(2, 3, 108, 50, 32, "bungalow", "#CFE3D2", "#6E9C7A", "garage-bungalow"),
 ];
 
 /** Locked districts' scenery (under clouds), and their centres for the lock pill. */
@@ -292,25 +300,31 @@ export function boardSvg(theme: Theme): string {
   if (night) for (let i = 0; i < 40; i++) s += `<circle cx="${(rand(i) * BOARD.w).toFixed(0)}" cy="${(rand(i + 99) * 100).toFixed(0)}" r="${rand(i + 7) > 0.8 ? 1.4 : 0.8}" fill="#FFF6E0" opacity=".8"/>`;
   s += cloutwood(night, c);
 
-  // Small gardens behind The Grind and The Rusty Amp.
-  for (let i = 0; i < 9; i++) s += tree(330 + i * 30, 470 + (i % 2) * 8, c);
+  // Blocks: a sidewalk square each, Lookout Park filling the first one, trees on every block's back corners.
+  for (const by of GRID.rows) for (const bx of GRID.cols) {
+    s += `<rect x="${bx}" y="${by}" width="${GRID.block}" height="${GRID.block}" rx="10" fill="${c.sidewalk}"/>`;
+    s += `<rect x="${bx + 8}" y="${by + 8}" width="${GRID.block - 16}" height="${GRID.block - 16}" rx="6" fill="${c.ground}"/>`;
+  }
+  s += `<rect x="${GRID.cols[0] + 8}" y="${GRID.rows[0] + 8}" width="${GRID.block - 16}" height="${GRID.block - 16}" rx="6" fill="${c.park}"/>`;
+  s += `<ellipse cx="${GRID.cols[0] + 75}" cy="${GRID.rows[0] + 80}" rx="26" ry="12" fill="${c.water}"/>`;
 
-  // Lookout Park, top left of Echo Flats.
-  s += `<rect x="168" y="290" width="118" height="124" rx="10" fill="${c.park}"/>`;
-  for (let i = 0; i < 7; i++) s += tree(186 + (i % 4) * 28, 320 + Math.floor(i / 4) * 50 + (i % 2) * 8, c);
-
-  // Roads, then palms along them.
+  // Streets with dashed centre lines.
   const half = ROADS.width / 2;
   for (const [y, x1, x2] of ROADS.h) s += `<rect x="${x1}" y="${y - half}" width="${x2 - x1}" height="${ROADS.width}" fill="${c.road}"/><line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${c.roadLine}" stroke-width="2" stroke-dasharray="10 10"/>`;
   for (const [x, y1, y2] of ROADS.v) s += `<rect x="${x - half}" y="${y1}" width="${ROADS.width}" height="${y2 - y1}" fill="${c.road}"/><line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${c.roadLine}" stroke-width="2" stroke-dasharray="10 10"/>`;
-
   s += districtScenery(night, c);
   s += haloDome(night, c);
 
-  // Palms along Echo Boulevard and the side of each vertical road, then buildings back to front.
+  // Trees on each block's corners (palms along Echo Boulevard), then buildings, back to front.
   const items: { y: number; svg: string }[] = [];
-  for (let x = 170; x <= 740; x += 52) items.push({ y: 640 - half - 2, svg: palm(x, 640 - half - 2, c) });
-  for (let x = 196; x <= 740; x += 52) items.push({ y: 640 + half + 26, svg: palm(x, 640 + half + 26, c) });
+  GRID.rows.forEach((by, r) => GRID.cols.forEach((bx) => {
+    const boulevard = r === 1 || r === 2;
+    for (const [tx, ty] of [[bx + 16, by + 30], [bx + GRID.block - 16, by + 30], [bx + 16, by + GRID.block - 10], [bx + GRID.block - 16, by + GRID.block - 10]]) {
+      const front = ty > by + 100;
+      if (boulevard && ((r === 1 && front) || (r === 2 && !front))) items.push({ y: ty, svg: palm(tx, ty, c) });
+      else if (!front || r === 0) items.push({ y: ty, svg: tree(tx, ty, c) });
+    }
+  }));
   for (const b of BUILDINGS) items.push({ y: b.y + b.d, svg: building(b, night, c) });
   items.sort((a, b) => a.y - b.y);
   for (const it of items) s += it.svg;
