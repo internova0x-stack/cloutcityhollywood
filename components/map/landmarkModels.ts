@@ -566,19 +566,20 @@ const LETTERS: Record<string, string[]> = {
 
 function cloutwoodSign(t: Themed): Group {
   const g = new Group();
-  // The hill: a long green ridge under the letters, scrubby on top.
-  const hill = new Mesh(new SphereGeometry(1, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), solid("#8DBF76"));
-  hill.scale.set(95, 46, 48);
-  g.add(hill);
+  // The hill: a tall green ridge, scrubby on top, the letters on its front slope.
+  const hill = new Mesh(new SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), solid("#8DBF76"));
+  hill.scale.set(80, 34, 40);
+  g.add(at(hill, 0, 0, -14));
   const scrub = solid("#5E9A58");
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * Math.PI * 2;
-    g.add(at(new Mesh(new IcosahedronGeometry(5 + (i % 3) * 2, 0), scrub), Math.cos(a) * 70, 14 + (i % 4) * 3, Math.sin(a) * 30 - 6));
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    g.add(at(new Mesh(new IcosahedronGeometry(3 + (i % 3) * 1.5, 0), scrub), Math.cos(a) * 62, 10 + (i % 4) * 2, Math.sin(a) * 26 - 18));
   }
-  const white = glowing(t, "#FFFFFF", "#FFF3DE", 1.3, 0.25);
-  const cell = 3;
+  // The letters: white by day; at night bright as a lit sign (basic glow), so they read across the dark hills.
+  const white = glowing(t, "#FFFFFF", "#FFFFFF", 2.6, 0.35);
+  const cell = 2.4;
   const word = "CLOUTWOOD";
-  const gap = cell * 1.3;
+  const gap = cell * 1.2;
   const total = [...word].reduce((acc, ch) => acc + LETTERS[ch][0].length * cell + gap, -gap);
   let x = -total / 2;
   const letters = new Group();
@@ -587,16 +588,19 @@ function cloutwoodSign(t: Themed): Group {
     rows.forEach((row, ri) => {
       [...row].forEach((on, ci) => {
         if (on !== "1") return;
-        letters.add(at(new Mesh(new BoxGeometry(cell, cell, 1.4), white), x + ci * cell + cell / 2, (rows.length - ri - 0.5) * cell, 0));
+        letters.add(at(new Mesh(new BoxGeometry(cell, cell, 1.2), white), x + ci * cell + cell / 2, (rows.length - ri - 0.5) * cell, 0));
       });
     });
     x += rows[0].length * cell + gap;
   }
-  // Stood on the front slope, leaning back a little with the hill.
-  letters.rotation.x = -0.25;
-  g.add(at(letters, 0, 26, 30));
-  // Floodlights under the letters at night.
-  g.add(at(lightPool(t, 60, "#FFF3DE", 0.4), 0, 20, 40));
+  // Upright on the slope, facing the camera, raised on short legs like a real hillside sign.
+  // Clear of the slope (the hill's surface is about 20 m up here), so no row sinks into it.
+  g.add(at(letters, 0, 24, 18));
+  const leg = solid("#9AA4AE");
+  for (let i = 0; i < 10; i++) g.add(at(new Mesh(new BoxGeometry(0.5, 8, 0.5), leg), -total / 2 + (i + 0.5) * (total / 10), 20, 17.5));
+  // Floodlights in front of the letters at night: a warm pool and upward beams.
+  g.add(at(lightPool(t, 55, "#FFF3DE", 0.55), 0, 12, 30));
+  searchlights(t, g, [[-total / 3, 14, 26], [total / 3, 14, 26]], 70);
   return g;
 }
 

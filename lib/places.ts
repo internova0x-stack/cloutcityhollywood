@@ -24,6 +24,7 @@ export const PLACE_PINS: PlacePin[] = [
   { id: "laundromat-loft", name: "Laundromat Loft", emoji: "🧺", category: "home", neighborhood: "Echo Flats", at: [34.0752, -118.2556], blurb: "A studio over a laundromat. The dryers keep time better than most drummers." },
   { id: "band-house", name: "Band House", emoji: "🏠", category: "home", neighborhood: "Echo Flats", at: [34.0818, -118.2618], blurb: "A room in a house where five bands share one fridge and zero rules." },
   { id: "garage-bungalow", name: "Garage Bungalow", emoji: "🏡", category: "home", neighborhood: "Echo Flats", at: [34.0882, -118.2662], blurb: "A bungalow with a garage you can be loud in. The neighbors have been warned." },
+  { id: "cloutwood-sign", name: "The CLOUTWOOD Sign", emoji: "🌄", category: "landmark", neighborhood: "Elysian Hills", at: [34.0846, -118.2468], blurb: "Nine giant letters on the hill and a lookout where everyone practices their album-cover face." },
   { id: "halo-dome", name: "The Halo Dome", emoji: "🏟️", category: "landmark", neighborhood: "Elysian Hills", at: [34.0739, -118.2400], blurb: "Stadium Status: locked. Sixty thousand seats, and not one of them knows your name." },
 ];
 

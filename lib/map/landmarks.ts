@@ -59,7 +59,7 @@ export const LANDMARKS: readonly Landmark[] = [
   { id: "garage-bungalow", placeId: "garage-bungalow", name: "Garage Bungalow", at: [34.0882, -118.2662], kind: "bungalow", facing: 180, scale: 2.2, clear: 30, ground: "block" },
   // Map flavor (Clarifications 3): the stadium at the far edge, always lit, and the hillside letters.
   { id: "halo-dome", placeId: "halo-dome", name: "The Halo Dome", at: [34.0739, -118.2400], kind: "halo-dome", facing: 200, scale: 1.5, clear: 230, ground: "block" },
-  { id: "cloutwood-sign", name: "CLOUTWOOD", at: [34.0846, -118.2468], kind: "cloutwood-sign", facing: 200, scale: 2.2, clear: 140, ground: "park" },
+  { id: "cloutwood-sign", placeId: "cloutwood-sign", name: "The CLOUTWOOD Sign", at: [34.0846, -118.2468], kind: "cloutwood-sign", facing: 180, scale: 3.5, clear: 120, ground: "park" },
 ];
 
 /**
