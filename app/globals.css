@@ -1985,3 +1985,16 @@ button.rank-chip::after { content:"›"; margin-left:2px; opacity:.6; }
 .claim-hint.good { color:var(--spotlight-400); }
 .claim-age { max-width:320px; color:var(--text-on-dark); text-align:left; }
 .claim-age a { color:var(--spotlight-400); font-weight:600; }
+
+/* ---- v0.1 step 3: locked districts under slow-drifting clouds (Clarifications 3) ---- */
+.map-district { position:absolute; left:0; top:0; width:0; height:0; will-change:transform; }
+.map-district .map-lock { position:absolute; left:0; top:0; transform:translate(-50%, -50%); pointer-events:auto; white-space:nowrap; }
+.map-lock-soon { margin-left:4px; font-size:11px; font-weight:600; opacity:.7; }
+.map-cloud { position:absolute; left:0; top:0; width:220px; height:90px; border-radius:50%; pointer-events:none;
+  background:radial-gradient(closest-side, rgba(255,255,255,.75), rgba(255,255,255,.35) 60%, rgba(255,255,255,0));
+  filter:blur(6px); animation:cloud-drift 38s ease-in-out infinite alternate; }
+.map-cloud.c0 { transform:translate(-170px, -70px); }
+.map-cloud.c1 { width:260px; height:110px; transform:translate(-40px, -10px); animation-duration:46s; }
+.map-cloud.c2 { width:180px; height:80px; transform:translate(-220px, 10px); animation-duration:31s; }
+@keyframes cloud-drift { from { margin-left:-30px; } to { margin-left:30px; } }
+@media (prefers-reduced-motion: reduce) { .map-cloud { animation:none; } }
