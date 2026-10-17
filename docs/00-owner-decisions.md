@@ -45,6 +45,18 @@ night themes, moving traffic, and locked districts shaded over.
 synth placeholder made in code, with a backing and a lead stem, at the song's BPM. Real AI or commissioned
 tracks replace them later as content, never code.
 
+## v0.1 includes practice
+
+**v0.1 has at least one place to play the music game** (owner, Oct 17): a free practice stage (the practice amp
+at home and an open-mic practice at The Grind) at Open Mic difficulty with a placeholder tune. It follows the
+practice rules (Clarifications §4.10): free, unlimited, no Energy, pays nothing. The paid open mic, the
+protected tutorial show, fame and the leaderboard stay in v0.2.
+
+## Palette
+
+Never purple (owner rule from Clout City). The sunset sky (`--g-sunset`) starts at deep navy `#16233F`
+instead of the Design System Guide's plum `#2B1A4A`; the rest of the gradient is as written.
+
 ## Repository
 
 This repository (`cloutcityhollywood`) is the game; Clout City NYC is `project-clout-city`. The Clout City
