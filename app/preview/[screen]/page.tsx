@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
 import { ClaimName } from "@/components/ClaimName";
-import { FrontCard } from "@/components/FrontCard";
+import { GuestMap } from "@/components/GuestMap";
 import { GameShell } from "@/components/GameShell";
 import type { CrewMember, Player } from "@/lib/player";
 import { previewCheckName, previewClaim } from "../previewActions";
 
 // Development-only previews with sample data, so screens can be checked without a Supabase
 // project. Nothing is saved. Never served in production.
-//   /preview/guest              the front card with the sign-up sheet open (?invited=1)
+//   /preview/guest              the guest map (?time=day|night, ?invited=1)
 //   /preview/create             claim your name (?age=1 adds the Google 18+ box)
 //   /preview/home               the home screen (?crew=0-6)
 
@@ -44,7 +44,7 @@ export default async function Preview({
   if (process.env.NODE_ENV === "production") notFound();
   const { screen } = await params;
   const q = await searchParams;
-  if (screen === "guest") return <FrontCard invited={q.invited === "1"} startOpen />;
+  if (screen === "guest") return <GuestMap invited={q.invited === "1"} forceTime={q.time === "day" || q.time === "night" ? q.time : undefined} />;
   if (screen === "create") return <ClaimName claim={previewClaim} check={previewCheckName} askAge={q.age === "1"} />;
   if (screen === "home") {
     const n = Math.max(0, Math.min(FRIENDS.length, Number(q.crew ?? 2) || 0));
