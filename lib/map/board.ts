@@ -9,11 +9,11 @@ export const BOARD = { w: 900, h: 1300 };
 
 export type Theme = "day" | "night";
 
-type Kind =
+export type Kind =
   | "cafe" | "divebar" | "club" | "theater" | "loft" | "house" | "bungalow" | "shop" | "diner" | "market"
   | "studio" | "precinct" | "hotel" | "tower" | "generic" | "mansion" | "hangar" | "stage" | "metro";
 
-interface Building {
+export interface Building {
   /** Footprint on the ground: left, top (back edge), width and depth, in board units. */
   x: number;
   y: number;
@@ -56,9 +56,9 @@ function rand(seed: number): number {
  * Echo Flats is a regular city grid (owner, Oct 17: more space between buildings, on a grid): streets every
  * 180 units each way, so every block is the same 150-unit square with one building set back from the street.
  */
-const GRID = { cols: [180, 360, 540], rows: [315, 495, 675, 855], block: 150, road: 30 };
+export const GRID = { cols: [180, 360, 540], rows: [315, 495, 675, 855], block: 150, road: 30 };
 
-const ROADS = {
+export const ROADS = {
   /** Horizontal streets: [y, x from, x to]. Echo Boulevard (y 660) runs the full width into the districts. */
   h: [[300, 165, 735], [480, 165, 735], [660, 0, 900], [840, 165, 735], [1020, 165, 735]] as [number, number, number][],
   /** Vertical streets: [x, y from, y to]. */
@@ -76,7 +76,7 @@ function inBlock(col: number, row: number, w: number, d: number, h: number, kind
 }
 
 /** Echo Flats, block by block (v0.1 shows the venues and homes as places; the rest are scenery until they open). */
-const BUILDINGS: Building[] = [
+export const BUILDINGS: Building[] = [
   // Row 0: Lookout Park (no building), a guitar shop, a market
   inBlock(1, 0, 100, 44, 34, "shop", "#E8B4B8", "#B5656F"),
   inBlock(2, 0, 104, 44, 30, "market", "#DDEBD3", "#5E9A58"),
