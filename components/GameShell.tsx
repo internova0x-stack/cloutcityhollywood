@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cityMinutes } from "@/lib/clock";
+import { audioContext } from "@/lib/show/audio";
 import type { CrewMember, Player } from "@/lib/player";
 import { sceneOf } from "@/lib/sound";
 import { handle } from "@/lib/validation";
@@ -9,6 +10,8 @@ import { ComingSoon, type ComingSoonKey } from "./ComingSoon";
 import { GameChrome, FameStar, type ChromeAction } from "./hud/GameChrome";
 import { InviteSheet } from "./InviteSheet";
 import { Sheet } from "./Sheet";
+import { PracticeSheet } from "./show/PracticeSheet";
+import { PracticeShow, type PracticeOptions } from "./show/PracticeShow";
 
 /** "9:41 PM" on the city clock (one day every 2 real hours). */
 function cityTime(nowMs: number): string {
@@ -18,8 +21,8 @@ function cityTime(nowMs: number): string {
 }
 
 /**
- * The signed-in home screen (v0.1). Only Home and the invite screen work; everything else opens a
- * "Coming soon" card. The room and the 3D artist arrive in a later step; until then a stage-lit
+ * The signed-in home screen (v0.1). Home, the invite screen and the practice amp work (owner, Oct 17: v0.1
+ * includes practice); everything else opens a "Coming soon" card. The room and the 3D artist arrive in a later step; until then a stage-lit
  * welcome card sits behind the chrome.
  */
 export function GameShell({
@@ -39,6 +42,8 @@ export function GameShell({
   const [soon, setSoon] = useState<ComingSoonKey | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [practiceOpen, setPracticeOpen] = useState(false);
+  const [practice, setPractice] = useState<PracticeOptions | null>(null);
   // The invite pill wears a dot until the player opens it once (Clarifications 2: notification pins).
   const [invitePin, setInvitePin] = useState(false);
 
@@ -88,6 +93,13 @@ export function GameShell({
             Your place is still getting its furniture. While the movers argue, round up your crew.
           </p>
           <p className="cch-crew-count" role="status">{Math.min(crew.length, 5)} of 5 joined</p>
+          <button className="practice-amp" onClick={() => setPracticeOpen(true)}>
+            <span className="practice-amp-icon" aria-hidden="true">🎸</span>
+            <span className="stack-4" style={{ minWidth: 0 }}>
+              <span className="body-strong" style={{ display: "block" }}>Practice amp</span>
+              <span className="meta" style={{ display: "block", color: "rgba(255,246,224,.75)" }}>Free · no Energy · pays nothing</span>
+            </span>
+          </button>
         </div>
       </section>
 
@@ -101,6 +113,17 @@ export function GameShell({
       />
 
       <ComingSoon which={soon} onClose={() => setSoon(null)} />
+      <PracticeSheet
+        open={practiceOpen}
+        onClose={() => setPracticeOpen(false)}
+        onStart={(o) => {
+          // Phones start audio only from a tap: wake it here, inside the tap, before the show mounts.
+          audioContext();
+          setPracticeOpen(false);
+          setPractice(o);
+        }}
+      />
+      {practice && <PracticeShow options={practice} onExit={() => setPractice(null)} />}
       <InviteSheet open={inviteOpen} onClose={() => setInviteOpen(false)} inviteCode={player.invite_code} crew={crew} />
       <Sheet open={profileOpen} onClose={() => setProfileOpen(false)} label="Your profile">
         <div className="stack-16" style={{ paddingTop: 8 }}>

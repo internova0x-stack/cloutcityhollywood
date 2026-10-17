@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ClaimName } from "@/components/ClaimName";
 import { GuestMap } from "@/components/GuestMap";
 import { GameShell } from "@/components/GameShell";
+import { PracticePreview } from "@/components/show/PracticePreview";
 import type { CrewMember, Player } from "@/lib/player";
 import { previewCheckName, previewClaim } from "../previewActions";
 
@@ -10,6 +11,7 @@ import { previewCheckName, previewClaim } from "../previewActions";
 //   /preview/guest              the guest map (?time=day|night, ?invited=1)
 //   /preview/create             claim your name (?age=1 adds the Google 18+ box)
 //   /preview/home               the home screen (?crew=0-6)
+//   /preview/practice           a practice run (?where=home|grind, ?speed=75, ?loop=verse|chorus, ?auto=1 plays itself)
 
 const SAMPLE: Player = {
   id: "00000000-0000-0000-0000-000000000000",
@@ -49,6 +51,14 @@ export default async function Preview({
   if (screen === "home") {
     const n = Math.max(0, Math.min(FRIENDS.length, Number(q.crew ?? 2) || 0));
     return <GameShell player={SAMPLE} crew={FRIENDS.slice(0, n)} preview />;
+  }
+  if (screen === "practice") {
+    const options = {
+      where: q.where === "grind" ? ("grind" as const) : ("home" as const),
+      speed: q.speed === "75" ? 0.75 : 1,
+      loop: q.loop === "verse" || q.loop === "chorus" ? q.loop : null,
+    };
+    return <PracticePreview options={options} auto={q.auto === "1"} />;
   }
   notFound();
 }
