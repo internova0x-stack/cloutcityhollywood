@@ -1,9 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { GAME_CONFIG } from "@/lib/config";
+import { normalizeInviteCode } from "@/lib/invite";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/env";
 
-// Runs before every page: refreshes the Supabase session cookie (ported from Clout City NYC).
-// Invite codes (?ref=CODE) join in v0.1 step 2.
+// Runs before every page: refreshes the Supabase session cookie and keeps an invite code
+// (?ref=CODE) so the friend who shared the link gets credit (ported from Clout City NYC).
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -23,6 +25,15 @@ export async function proxy(request: NextRequest) {
     });
     // Touching the user refreshes an expiring session.
     await supabase.auth.getUser();
+  }
+
+  const ref = normalizeInviteCode(request.nextUrl.searchParams.get("ref"));
+  if (ref) {
+    response.cookies.set(GAME_CONFIG.invite.cookieName, ref, {
+      path: "/",
+      maxAge: GAME_CONFIG.invite.cookieMaxAgeDays * 24 * 60 * 60,
+      sameSite: "lax",
+    });
   }
 
   return response;

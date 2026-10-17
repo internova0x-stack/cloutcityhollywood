@@ -1,0 +1,54 @@
+import { notFound } from "next/navigation";
+import { ClaimName } from "@/components/ClaimName";
+import { FrontCard } from "@/components/FrontCard";
+import { GameShell } from "@/components/GameShell";
+import type { CrewMember, Player } from "@/lib/player";
+import { previewCheckName, previewClaim } from "../previewActions";
+
+// Development-only previews with sample data, so screens can be checked without a Supabase
+// project. Nothing is saved. Never served in production.
+//   /preview/guest              the front card with the sign-up sheet open (?invited=1)
+//   /preview/create             claim your name (?age=1 adds the Google 18+ box)
+//   /preview/home               the home screen (?crew=0-6)
+
+const SAMPLE: Player = {
+  id: "00000000-0000-0000-0000-000000000000",
+  display_name: "riffqueen",
+  look: {},
+  scene: null,
+  instrument: null,
+  band_name: null,
+  invite_code: "K7M4QX",
+  onboarding_step: "name_done",
+  fame: 0,
+  music_muted: true,
+  created_at: new Date(0).toISOString(),
+};
+
+const FRIENDS: CrewMember[] = [
+  { display_name: "keyskid", scene: "synthwave_kid", joined_at: "2026-10-16T18:00:00Z" },
+  { display_name: "lofi.lou", scene: "bedroom_pop", joined_at: "2026-10-16T19:10:00Z" },
+  { display_name: "dez_drums", scene: "garage_rocker", joined_at: "2026-10-17T09:30:00Z" },
+  { display_name: "porchlight", scene: "country_crossover", joined_at: "2026-10-17T10:00:00Z" },
+  { display_name: "safety.pin", scene: "mall_punk", joined_at: "2026-10-17T11:00:00Z" },
+  { display_name: "lagos2la", scene: "afrobeats_dreamer", joined_at: "2026-10-17T12:00:00Z" },
+];
+
+export default async function Preview({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ screen: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  if (process.env.NODE_ENV === "production") notFound();
+  const { screen } = await params;
+  const q = await searchParams;
+  if (screen === "guest") return <FrontCard invited={q.invited === "1"} startOpen />;
+  if (screen === "create") return <ClaimName claim={previewClaim} check={previewCheckName} askAge={q.age === "1"} />;
+  if (screen === "home") {
+    const n = Math.max(0, Math.min(FRIENDS.length, Number(q.crew ?? 2) || 0));
+    return <GameShell player={SAMPLE} crew={FRIENDS.slice(0, n)} preview />;
+  }
+  notFound();
+}

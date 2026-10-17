@@ -1966,3 +1966,22 @@ button.rank-chip::after { content:"›"; margin-left:2px; opacity:.6; }
 .hold-tagline { margin:8px 0 0; font-family:var(--font-display); font-size:22px; letter-spacing:.04em; color:var(--text-on-dark); }
 .hold-copy { margin:0; font-size:15px; line-height:22px; color:rgba(255,246,224,.85); }
 .hold-soon { margin:6px 0 0; font-family:var(--font-label); font-weight:700; letter-spacing:.12em; text-transform:uppercase; font-size:13px; color:var(--spotlight-400); }
+
+/* ---- v0.1 step 2: the signed-in home before the room arrives ---- */
+.cch-home { background:var(--g-sunset); }
+.cch-stage { position:absolute; inset:0; display:grid; place-items:center; padding:120px max(88px, env(safe-area-inset-right,0px)) 180px max(24px, env(safe-area-inset-left,0px)); }
+.cch-welcome { display:grid; gap:10px; max-width:320px; text-align:left; }
+.cch-crew-count { margin:6px 0 0; font-family:var(--font-label); font-weight:700; letter-spacing:.12em; text-transform:uppercase; font-size:13px; color:var(--spotlight-400); }
+.cch-head { display:grid; place-items:center; width:100%; height:100%; border-radius:50%; background:var(--night-900); color:var(--spotlight-400); font-family:var(--font-label); font-weight:700; font-size:20px; letter-spacing:.04em; }
+.cch-head-lg { width:56px; height:56px; flex:none; }
+.hold-actions { display:grid; gap:8px; width:100%; max-width:320px; margin-top:14px; }
+.hold-login { color:var(--text-on-dark); }
+.hold-error { margin:4px 0 0; max-width:320px; padding:10px 14px; border-radius:var(--r-sm); background:rgba(23,20,28,.55); color:var(--text-on-dark); font-size:14px; line-height:1.4; }
+.claim-card { width:100%; max-width:360px; }
+.claim-field { width:100%; max-width:320px; }
+.claim-at { font-weight:700; color:var(--text-3); }
+.claim-hint { margin:0; min-height:20px; font-size:13px; color:rgba(255,255,255,.8); }
+.claim-hint.bad { color:#FFD3C2; }
+.claim-hint.good { color:var(--spotlight-400); }
+.claim-age { max-width:320px; color:var(--text-on-dark); text-align:left; }
+.claim-age a { color:var(--spotlight-400); font-weight:600; }
