@@ -27,6 +27,16 @@ Hollywood ports **today's** Clout City, not its v2 documents (owner, Oct 17):
 - **Onboarding:** Lola's tour (her head in the corner, a chat bubble per step) in place of the welcome pop-up and five plain tooltips; the five steps keep the Hollywood copy (fame, money, map, phone, Shows).
 - **Sign-in:** the in-app email code (it keeps the home-screen app full screen on iOS), plus Google.
 
+## Invited friends are your band
+
+**"Create your band"** (owner, Oct 17) replaces "Invite your Crew": the friends a player invites are their band,
+everywhere players see it (the HUD pill, the invite sheet, the home screen, the profile). The side column's Band
+button opens the same sheet. Code, types and tables keep the word `crew` (as Clout City NYC kept `clique`).
+
+This takes the word "band" from the hired bandmates of Clarifications §5 and Design C61 to C63 (drums, bass, keys,
+Chemistry, from v0.3). They need a new player-facing name before v0.3 (for example "session players"); proposed
+for owner approval when v0.3 is built.
+
 ## Map
 
 **Same map style as Clout City NYC** (owner, Oct 17), not the hand-illustrated board in the Concept Note,

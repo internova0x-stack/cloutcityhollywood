@@ -61,7 +61,8 @@ export function GameShell({
 
   function onAction(a: ChromeAction) {
     if (a === "tab:home") return;
-    if (a === "invite") {
+    // Invited friends are your band (owner, Oct 17), so the Band button opens the same sheet.
+    if (a === "invite" || a === "band") {
       setInviteOpen(true);
       setInvitePin(false);
       try {
@@ -90,9 +91,9 @@ export function GameShell({
           <p className="overline" style={{ margin: 0, color: "var(--marquee-bulb)" }}>Echo Flats · Home</p>
           <h1 className="display-lg" style={{ margin: 0, color: "var(--text-on-dark)" }}>{handle(player.display_name)}</h1>
           <p className="subtext" style={{ margin: 0, color: "rgba(255,255,255,.82)" }}>
-            Your place is still getting its furniture. While the movers argue, round up your crew.
+            Your place is still getting its furniture. While the movers argue, put your band together.
           </p>
-          <p className="cch-crew-count" role="status">{Math.min(crew.length, 5)} of 5 joined</p>
+          <p className="cch-crew-count" role="status">{Math.min(crew.length, 5)} of 5 joined your band</p>
           <button className="practice-amp" onClick={() => setPracticeOpen(true)}>
             <span className="practice-amp-icon" aria-hidden="true">🎸</span>
             <span className="stack-4" style={{ minWidth: 0 }}>
@@ -139,7 +140,7 @@ export function GameShell({
             <span className="body-strong">— <span className="meta">· Nobody (for now)</span></span>
           </div>
           <div className="card row" style={{ justifyContent: "space-between" }}>
-            <span className="body-strong">Crew</span>
+            <span className="body-strong">Band</span>
             <span className="body-strong">{Math.min(crew.length, 5)} of 5 joined</span>
           </div>
           {!preview && (

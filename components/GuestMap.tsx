@@ -65,7 +65,7 @@ export function GuestMap({ invited = false, authError = false, forceTime }: { in
           </p>
           {(authError || invited) && (
             <p className="subtext" style={{ margin: "6px 0 0", color: authError ? "var(--red-text)" : "var(--text-2)" }}>
-              {authError ? "That sign-in link expired or was already used. Grab a fresh one." : "A friend saved you a spot in their crew. Claim your name before the town opens."}
+              {authError ? "That sign-in link expired or was already used. Grab a fresh one." : "A friend saved you a spot in their band. Claim your name before the town opens."}
             </p>
           )}
           <div className="row" style={{ gap: 8, marginTop: 12 }}>

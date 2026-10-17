@@ -17,7 +17,7 @@ const STATS = [
 
 /**
  * The home-screen chrome (Clarifications 2, Clout City's layout): the top bar with the fame star,
- * the Invite your Crew pill, the fixed side column (Tasks, Shows, Places, Band, Bills, Your Look),
+ * the Create your band pill, the fixed side column (Tasks, Shows, Places, Band, Bills, Your Look),
  * the collapsible stats panel and the bottom nav. Fame, money and stats show "—" until v0.2.
  */
 export function GameChrome({
@@ -71,7 +71,7 @@ export function GameChrome({
 
       <div className="under-hud">
         <button className="pill-glass glass-hud" style={{ position: "relative" }} onClick={() => onAction("invite")}>
-          Invite your Crew
+          Create your band
           {invitePin && <span className="pin-dot" style={{ top: -2, right: -2 }} />}
         </button>
       </div>
