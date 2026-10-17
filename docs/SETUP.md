@@ -10,7 +10,20 @@ NYC, so player data never mixes.
    adds a migration says which files to run. Never edit a file that has been run; new rules come as new files.
 3. **Project settings → API:** copy the **Project URL** and the **anon (publishable) key** for Vercel. The
    **service role key** is secret: it goes in Vercel only, never in the code or a chat.
-4. Sign-in settings (email code, Google, the email template) are added in v0.1 step 2.
+4. **Sign-in (v0.1 step 2).**
+   - **Authentication → Sign In / Providers → Email**: keep Email on.
+   - **Authentication → URL Configuration**: **Site URL** is your live address (e.g. your Vercel address).
+     **Redirect URLs**: add `https://<your-site>/**`, `https://*-<your-team>.vercel.app/**` (previews) and
+     `http://localhost:3000/**`.
+   - **Authentication → Email Templates**: for **both** "Magic Link" and "Confirm signup", set the subject to
+     `Your Clout City code: {{ .Token }}` and paste the body from `supabase/email-templates/magic-link.html`.
+     Supabase's default templates have no code, and the installed app signs in with the code (an email link
+     opens the browser, not the app). The link in this template opens a page with a button, so email
+     scanners that open links first can't use it up.
+   - **Google (optional)**: **Authentication → Sign In / Providers → Google**: turn it on and paste a Google
+     OAuth client ID and secret (Google Cloud Console → APIs & Services → Credentials → OAuth client ID → Web
+     application, with the redirect URI Supabase shows on that page). Until then the Google button says it
+     isn't switched on yet and email keeps working.
 
 ## 2. Vercel (the website and previews)
 1. At https://vercel.com, **Add New → Project**, import `internova0x-stack/cloutcityhollywood`. Framework: Next.js

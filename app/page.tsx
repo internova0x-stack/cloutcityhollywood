@@ -1,14 +1,12 @@
-// v0.1 step 1: a holding page while the town is built. The guest map replaces it in step 3.
-export default function Home() {
-  return (
-    <main className="hold">
-      <div className="hold-card">
-        <span className="studio-mark hold-mark">Clout City</span>
-        <span className="hold-badge">Hollywood Music</span>
-        <p className="hold-tagline">PLAY LOUD. BLOW UP.</p>
-        <p className="hold-copy">Welcome to Hollywood. Every waiter here is in a band. Yours just has to be the one that makes it.</p>
-        <p className="hold-soon">The doors open soon.</p>
-      </div>
-    </main>
-  );
+import { redirect } from "next/navigation";
+import { FrontCard } from "@/components/FrontCard";
+import { getSession } from "@/lib/player";
+
+// The front door: the holding card with Sign up and Log in. The guest map replaces the card in
+// v0.1 step 3. Signed-in players go straight to the game.
+export default async function Front({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const { user, player } = await getSession();
+  if (user) redirect(player ? "/home" : "/create");
+  const params = await searchParams;
+  return <FrontCard invited={params.invited === "1"} authError={params.auth_error === "link"} />;
 }
