@@ -12,7 +12,50 @@ import {
   TorusGeometry, Vector3, WebGLRenderer, type Material,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { BOARD, BUILDINGS, DISTRICTS, GRID, HALO_DOME, ROADS, SPOTS, type Building, type Spot } from "../../lib/map/board.ts";
+import {
+  BUILDINGS as BOARD_BUILDINGS, DISTRICTS as BOARD_DISTRICTS, GRID as BOARD_GRID, HALO_DOME as BOARD_HALO, SPOTS,
+  type Building, type Spot,
+} from "../../lib/map/board.ts";
+
+/**
+ * The 3D city spreads the 2D board's grid out (owner, Oct 18: wider roads, more space between buildings): every block
+ * keeps its size, but block centres move apart by SPREAD around the board's middle, so the streets become boulevards.
+ */
+const SPREAD = 1.3;
+const MID = { x: 450, y: 660 };
+const spread = (v: number, c: number) => c + (v - c) * SPREAD;
+const half = BOARD_GRID.block / 2;
+export const GRID = {
+  cols: BOARD_GRID.cols.map((x) => spread(x + half, MID.x) - half),
+  rows: BOARD_GRID.rows.map((y) => spread(y + half, MID.y) - half),
+  block: BOARD_GRID.block,
+};
+/** Street width: the gap between neighbouring blocks. */
+const STREET = GRID.cols[1] - GRID.cols[0] - GRID.block;
+const lastCol = GRID.cols[GRID.cols.length - 1] + GRID.block, lastRow = GRID.rows[GRID.rows.length - 1] + GRID.block;
+const ROADS = {
+  h: [
+    ...GRID.rows.map((r) => r - STREET / 2), lastRow + STREET / 2,
+  ].map((y, i) => (i === 2 ? [y, -300, 1200] : [y, GRID.cols[0] - STREET, lastCol + STREET]) as [number, number, number]),
+  v: [...GRID.cols.map((c) => c - STREET / 2), lastCol + STREET / 2].map((x) => [x, GRID.rows[0] - STREET, lastRow + STREET] as [number, number, number]),
+  width: STREET,
+};
+/** Echo Boulevard, the street between rows 1 and 2, runs out into the districts. */
+const BOULEVARD_Z = GRID.rows[2] - STREET / 2;
+/** Each building moves with its block. */
+const BUILDINGS: Building[] = BOARD_BUILDINGS.map((b) => {
+  const col = BOARD_GRID.cols.findIndex((c) => b.x >= c && b.x < c + BOARD_GRID.block);
+  const row = BOARD_GRID.rows.findIndex((r) => b.y >= r - 20 && b.y < r + BOARD_GRID.block);
+  return { ...b, x: b.x + GRID.cols[col] - BOARD_GRID.cols[col], y: b.y + GRID.rows[row] - BOARD_GRID.rows[row] };
+});
+const DISTRICTS = BOARD_DISTRICTS.map((d) => {
+  const [x, y, w, h] = d.rect;
+  const dx = spread(x + w / 2, MID.x) - (x + w / 2), dy = spread(y + h / 2, MID.y) - (y + h / 2);
+  return { ...d, x: d.x + dx, y: d.y + dy, rect: [x + dx, y + dy, w, h] as const };
+});
+const HALO_DOME = { x: spread(BOARD_HALO.x, MID.x), y: spread(BOARD_HALO.y, MID.y) };
+/** The 3D city's extent, for keeping the camera over it. */
+export const BOUNDS = { x0: -120, x1: 1020, y0: -40, y1: 1360 };
 
 /** Buildings are deeper in 3D than their foreshortened 2D footprints. */
 const DEPTH = 1.5;
@@ -23,10 +66,10 @@ export const YAW = 30;
 /** Each place's building moves to the front of its block, so the street is lined with buildings. */
 const FRONT_INSET = 12;
 /** The CLOUTWOOD letters on the big hill across the back (north) of the board. */
-const LETTERS = { x: 330, z: 214, y: 176, w: 460 };
+const LETTERS = { x: 330, z: 124, y: 176, w: 460 };
 /** The hills behind the town: [centre x, centre z, radius x, height, radius z]. */
 const HILLS: [number, number, number, number, number][] = [
-  [400, 40, 330, 270, 205], [-60, 30, 260, 210, 190], [820, 20, 300, 240, 200], [1150, 40, 220, 170, 170],
+  [400, -50, 330, 270, 205], [-60, -60, 260, 210, 190], [820, -70, 300, 240, 200], [1150, -50, 220, 170, 170],
 ];
 
 /** The ground height of the hills at a point (0 on the flat). */
@@ -42,7 +85,7 @@ function hillHeight(x: number, z: number): number {
 /** Which grid block a building stands in. */
 function blockOf(b: Building) {
   const col = GRID.cols.findIndex((c) => b.x >= c && b.x < c + GRID.block);
-  const row = GRID.rows.findIndex((r) => b.y >= r - 20 && b.y < r + GRID.block);
+  const row = GRID.rows.findIndex((r) => b.y >= r - 30 && b.y < r + GRID.block);
   return { bx: GRID.cols[col], by: GRID.rows[row], col, row };
 }
 
@@ -61,6 +104,7 @@ export const SPOTS_3D: Spot[] = SPOTS.map((s) => {
     return { id: s.id, x: b.x + b.w / 2, y: by + GRID.block - FRONT_INSET + 4 };
   }
   if (s.id === "cloutwood-sign") return { id: s.id, x: LETTERS.x, y: LETTERS.z + 60 };
+  if (s.id === "halo-dome") return { id: s.id, x: HALO_DOME.x, y: HALO_DOME.y + 62 };
   return s;
 });
 const INK = "#3B2F35";
@@ -95,7 +139,7 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   const toonCache = new Map<string, MeshLambertMaterial>();
   const toon = (color: string) => {
     let m = toonCache.get(color);
-    if (!m) toonCache.set(color, (m = new MeshLambertMaterial({ color: new Color(color).offsetHSL(0, 0.14, 0) })));
+    if (!m) toonCache.set(color, (m = new MeshLambertMaterial({ color: new Color(color).offsetHSL(0, 0.04, 0.02) })));
     return m;
   };
   /** Things that glow at night (windows, signs, neon): plain colour, swapped between day and night. */
@@ -119,9 +163,9 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   };
 
   // ---- Ground, blocks and streets ----
-  const ground = new Mesh(new PlaneGeometry(BOARD.w + 400, BOARD.h + 400), toon("#6FB548"));
+  const ground = new Mesh(new PlaneGeometry(BOUNDS.x1 - BOUNDS.x0 + 800, BOUNDS.y1 - BOUNDS.y0 + 800), toon("#C9B27D"));
   ground.rotation.x = -Math.PI / 2;
-  at(ground, BOARD.w / 2, 0, BOARD.h / 2);
+  at(ground, (BOUNDS.x0 + BOUNDS.x1) / 2, 0, (BOUNDS.y0 + BOUNDS.y1) / 2);
   scene.add(ground);
   const groundMat = ground.material as MeshLambertMaterial;
 
@@ -130,17 +174,21 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     m.rotation.x = -Math.PI / 2;
     return at(m, x, y, z);
   };
-  const roadMat = toon("#E3CFA0");
+  const roadMat = toon("#8F8A86");
   for (const [y, x1, x2] of ROADS.h) scene.add(flat(x2 - x1, ROADS.width, roadMat, (x1 + x2) / 2, y, 0.3));
   for (const [x, y1, y2] of ROADS.v) scene.add(flat(ROADS.width, y2 - y1, roadMat, x, (y1 + y2) / 2, 0.3));
+  // White centre lines on every street.
+  const dashes: { x: number; y: number; z: number; ry?: number }[] = [];
+  for (const [y, x1, x2] of ROADS.h) for (let x = x1 + 10; x < x2; x += 22) dashes.push({ x, y: 0.5, z: y });
+  for (const [x, y1, y2] of ROADS.v) for (let y = y1 + 10; y < y2; y += 22) dashes.push({ x, y: 0.5, z: y, ry: Math.PI / 2 });
   // Each block: a raised pavement slab; Lookout Park keeps its grass, pond and a fountain.
-  const kerb = toon("#CDB98C");
-  const paving = toon("#DCCFB6");
+  const kerb = toon("#D8CDB8");
+  const paving = toon("#ECE4D4");
   GRID.rows.forEach((by, r) => GRID.cols.forEach((bx, c) => {
     const slab = new Mesh(new BoxGeometry(GRID.block, 3, GRID.block), kerb);
     scene.add(at(slab, bx + GRID.block / 2, 1.5, by + GRID.block / 2));
     const park = r === 0 && c === 0;
-    scene.add(flat(GRID.block - 8, GRID.block - 8, park ? toon("#5FAE3E") : paving, bx + GRID.block / 2, by + GRID.block / 2, 3.2));
+    scene.add(flat(GRID.block - 8, GRID.block - 8, park ? toon("#7F9A4C") : paving, bx + GRID.block / 2, by + GRID.block / 2, 3.2));
     if (park) {
       scene.add(flat(52, 26, glow("#8FD0E6", "#1E3A55"), bx + 75, by + 92, 3.4));
       scene.add(at(new Mesh(new CylinderGeometry(9, 11, 5, 16), kerb), bx + 75, 5.5, by + 48));
@@ -157,7 +205,7 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   }
 
   // ---- Trees, palms, street lamps and traffic (instanced, so a whole city stays cheap to draw) ----
-  const leaf = toon("#4FA635"), leafDark = toon("#3A8A2B"), trunk = toon("#8A5A33");
+  const leaf = toon("#6B8A3A"), leafDark = toon("#5F8B3B"), trunk = toon("#9B7B55");
   type Spot3 = { x: number; y: number; z: number; ry?: number; s?: number };
   function instanced(geo: BufferGeometry, mat: Material, spots: Spot3[], colors?: string[]): InstancedMesh {
     const m = new InstancedMesh(geo, mat, spots.length);
@@ -199,9 +247,10 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     void c;
   }));
   // Palms also run out along Echo Boulevard into the districts.
-  for (let x = 12; x < 160; x += 36) palms.push({ x, y: 0, z: 640 }, { x, y: 0, z: 680 });
-  for (let x = 742; x < 900; x += 36) palms.push({ x, y: 0, z: 640 }, { x, y: 0, z: 680 });
+  for (let x = -260; x < GRID.cols[0] - STREET; x += 40) palms.push({ x, y: 0, z: BOULEVARD_Z - STREET / 2 + 6 }, { x, y: 0, z: BOULEVARD_Z + STREET / 2 - 6 });
+  for (let x = lastCol + STREET + 20; x < 1160; x += 40) palms.push({ x, y: 0, z: BOULEVARD_Z - STREET / 2 + 6 }, { x, y: 0, z: BOULEVARD_Z + STREET / 2 - 6 });
   palms.forEach((p, i) => { p.ry = i * 1.3; p.s = 0.9 + ((i * 37) % 10) / 40; });
+  scene.add(instanced(new PlaneGeometry(10, 1.6).rotateX(-Math.PI / 2), glow("#FFFFFF", "#8A8170"), dashes));
   scene.add(instanced(trunkGeo, trunk, palms));
   scene.add(instanced(crownGeo, leafDark, palms));
 
@@ -216,10 +265,10 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   // Traffic: cars in both lanes of every street.
   const cars: Spot3[] = [];
   ROADS.h.forEach(([y, x1, x2], i) => {
-    for (let x = x1 + 40 + (i * 23) % 50; x < x2 - 20; x += 110) cars.push({ x, y: 0, z: y - 7, ry: Math.PI / 2 }, { x: x + 55, y: 0, z: y + 7, ry: -Math.PI / 2 });
+    for (let x = x1 + 40 + (i * 23) % 50; x < x2 - 20; x += 120) cars.push({ x, y: 0, z: y - 14, ry: Math.PI / 2 }, { x: x + 60, y: 0, z: y + 14, ry: -Math.PI / 2 });
   });
   ROADS.v.forEach(([x, y1, y2], i) => {
-    for (let y = y1 + 60 + (i * 31) % 50; y < y2 - 20; y += 150) cars.push({ x: x + 7, y: 0, z: y, ry: 0 }, { x: x - 7, y: 0, z: y + 70, ry: Math.PI });
+    for (let y = y1 + 60 + (i * 31) % 50; y < y2 - 20; y += 160) cars.push({ x: x + 14, y: 0, z: y, ry: 0 }, { x: x - 14, y: 0, z: y + 80, ry: Math.PI });
   });
   const carGeo = mergeGeometries([new BoxGeometry(9, 5, 16).translate(0, 3.5, 0), new BoxGeometry(8, 4, 8).translate(0, 8, -1)]);
   scene.add(instanced(carGeo, new MeshLambertMaterial({ color: "#FFFFFF" }), cars, ["#E8483B", "#F2C230", "#3E7FD6", "#FFFFFF", "#2E2A33", "#4CB36B", "#F08AB0"]));
@@ -316,6 +365,14 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
         break;
       case "theater": {
         windows(g, b.w, b.h, front, 30, b.h - 4, b.x);
+        // Two tiers of jade roof with red eaves above the parapet.
+        for (const [i, scale] of [[0, 1], [1, 0.62]] as const) {
+          const tier = new Mesh(new ConeGeometry(Math.SQRT1_2, 1, 4, 1), toon("#3F8F7A"));
+          tier.rotation.y = Math.PI / 4;
+          tier.scale.set((b.w + 4) * scale, 22, (D + 4) * scale);
+          g.add(at(tier, 0, b.h + 17 + i * 18, 0));
+          g.add(at(new Mesh(new BoxGeometry((b.w + 8) * scale, 3, (D + 8) * scale), toon("#B8382F")), 0, b.h + 7 + i * 18, 0));
+        }
         const marquee = inked(new BoxGeometry(b.w - 20, 12, 16), toon("#2A2530"), 0.8);
         g.add(at(marquee, 0, 22, front + 8));
         const bulb = glow("#E9D8A6", "#FFE7A8", true);
@@ -366,7 +423,7 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   for (const b of BUILDINGS) scene.add(building(cityBuilding(b)));
 
   // Mid-rise fillers behind each place make the blocks read as a city: two per block, with rooftop details.
-  const fillerColors = ["#E9D3B0", "#C9D6E3", "#E8B9A8", "#B7C9B0", "#F2E2C4", "#9FB3C8", "#D9C2E0", "#F0C9A0"];
+  const fillerColors = ["#F5F0E6", "#F2E2CC", "#F4D7C3", "#EFE5C8", "#E8ECEF", "#F0D2CC", "#E7DFD2", "#F7EBD8"];
   function filler(x: number, z: number, w: number, d: number, h: number, seed: number) {
     const g = new Group();
     g.add(at(new Mesh(new BoxGeometry(w, h, d), toon(fillerColors[seed % fillerColors.length])), 0, h / 2, 0));
@@ -384,13 +441,18 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
       pane.rotation.y = Math.PI / 2;
       g.add(at(pane, w / 2 + 0.4, 10 + r * 14, -d / 2 + (d / sideCols) * (k + 0.5)));
     }
-    // A rooftop detail: a water tower, air-conditioning units or a billboard.
-    const kind = seed % 3;
+    // A rooftop detail: a water tower, air-conditioning units, a billboard or a terracotta tile roof.
+    const kind = seed % 4;
     if (kind === 0) {
       g.add(at(new Mesh(new CylinderGeometry(6, 6, 9, 10), toon("#9C6B44")), w / 4, h + 12, 0));
       g.add(at(new Mesh(new ConeGeometry(6.5, 5, 10), toon("#7A5236")), w / 4, h + 19, 0));
     } else if (kind === 1) {
       for (const dx of [-8, 6]) g.add(at(new Mesh(new BoxGeometry(8, 5, 8), toon("#C7C7CC")), dx, h + 6.5, 0));
+    } else if (kind === 3) {
+      const tiles = new Mesh(new ConeGeometry(Math.SQRT1_2, 1, 4, 1), toon("#C1583F"));
+      tiles.rotation.y = Math.PI / 4;
+      tiles.scale.set(w + 8, 16, d + 8);
+      g.add(at(tiles, 0, h + 12, 0));
     } else {
       const board = new Mesh(new BoxGeometry(w * 0.8, 16, 2), glow(["#F2C230", "#E8483B", "#3E7FD6"][seed % 3], ["#FF2E88", "#2EC4FF", "#FFC21A"][seed % 3], true));
       g.add(at(board, 0, h + 16, 0));
@@ -398,38 +460,91 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     }
     return at(g, x, 3, z);
   }
+  /** The Spinning Disc: a round record-company tower of stacked tiers (an original nod to a famous one). */
+  function recordTower(x: number, z: number) {
+    const g = new Group();
+    for (let i = 0; i < 7; i++) {
+      const r = 24 - i * 1.6;
+      g.add(at(new Mesh(new CylinderGeometry(r, r, 11, 24), toon("#F4F1EA")), 0, 6 + i * 13, 0));
+      g.add(at(new Mesh(new CylinderGeometry(r + 2.2, r + 2.2, 2.2, 24), toon("#6F8FA8")), 0, 12.5 + i * 13, 0));
+      g.add(at(new Mesh(new CylinderGeometry(r + 0.3, r + 0.3, 5, 24), glow("#9FC3E0", "#FFD27A")), 0, 6 + i * 13, 0));
+    }
+    g.add(at(new Mesh(new CylinderGeometry(0.8, 1.2, 40, 6), toon("#C7C7CC")), 0, 112, 0));
+    g.add(at(new Mesh(new SphereGeometry(2.2, 8, 6), glow("#E8483B", "#FF4D4D", true)), 0, 133, 0));
+    return at(g, x, 3, z);
+  }
   GRID.rows.forEach((by, r) => GRID.cols.forEach((bx, c) => {
     if (r === 0 && c === 0) return;
     const seed = r * 3 + c;
     // Kept lower than the places' buildings in front, so the venues stay the stars of each block.
     const h1 = 42 + ((seed * 53) % 46), h2 = 38 + ((seed * 71) % 56);
-    scene.add(filler(bx + 36, by + 32, 58, 44, h1, seed));
-    scene.add(filler(bx + 112, by + 32, 58, 44, h2, seed + 5));
+    scene.add(filler(bx + 30, by + 30, 48, 42, h1, seed));
+    if (r === 0 && c === 2) scene.add(recordTower(bx + 118, by + 34));
+    else scene.add(filler(bx + 120, by + 30, 48, 42, h2, seed + 5));
   }));
 
   // ---- The hills across the back, with the CLOUTWOOD letters and a few hillside homes ----
   HILLS.forEach(([cx, cz, rx, h, rz], i) => {
-    const hill = new Mesh(new SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), toon(i % 2 ? "#62A944" : "#79BE52"));
+    const hill = new Mesh(new SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), toon(i % 2 ? "#C2A065" : "#CDAE73"));
     hill.scale.set(rx, h, rz);
     scene.add(at(hill, cx, 0, cz));
   });
   const hillTrees: Spot3[] = [];
-  for (let i = 0; i < 70; i++) {
-    const x = -150 + ((i * 97) % 1250), z = -40 + ((i * 53) % 230);
+  for (let i = 0; i < 90; i++) {
+    const x = -150 + ((i * 97) % 1250), z = -130 + ((i * 53) % 240);
     const y = hillHeight(x, z);
     if (y > 20 && !(Math.abs(x - LETTERS.x) < LETTERS.w / 2 + 10 && z > 170)) hillTrees.push({ x, y: y - 2, z, ry: i, s: 0.8 + (i % 4) * 0.15 });
   }
-  scene.add(instanced(bushGeo, leaf, [...hillTrees, ...parkTrees]));
-  // Hillside homes, high above the city.
-  for (let i = 0; i < 7; i++) {
-    const x = 60 + i * 125, z = 120 + (i % 2) * 40;
+  scene.add(instanced(bushGeo, toon("#6B7D3A"), hillTrees));
+  scene.add(instanced(bushGeo, leaf, parkTrees));
+  // Hillside homes, white stucco with terracotta roofs, stepping up the lower slopes.
+  const homeWalls = ["#FFF6E8", "#F6E3CF", "#F3D6C6", "#EFE7D6"];
+  for (let i = 0; i < 22; i++) {
+    const x = -100 + ((i * 131) % 1150), z = 40 + ((i * 37) % 90);
     const y = hillHeight(x, z);
-    if (y < 30 || Math.abs(x - LETTERS.x) < LETTERS.w / 2) continue;
+    if (y < 12 || y > 150 || (Math.abs(x - LETTERS.x) < LETTERS.w / 2 + 10 && z < LETTERS.z + 50)) continue;
     const home = new Group();
-    home.add(at(new Mesh(new BoxGeometry(26, 14, 20), toon("#FFF6E8")), 0, 7, 0));
-    home.add(at(new Mesh(new BoxGeometry(30, 4, 24), toon("#D9453B")), 0, 16, 0));
+    home.add(at(new Mesh(new BoxGeometry(26, 14, 20), toon(homeWalls[i % homeWalls.length])), 0, 7, 0));
+    const roof = new Mesh(new ConeGeometry(Math.SQRT1_2, 1, 4, 1), toon("#C1583F"));
+    roof.rotation.y = Math.PI / 4;
+    roof.scale.set(32, 10, 26);
+    home.add(at(roof, 0, 19, 0));
     home.add(at(new Mesh(new PlaneGeometry(12, 6), glow("#8FD0E6", "#FFD27A")), 0, 7, 10.2));
-    scene.add(at(home, x, y - 4, z));
+    home.rotation.y = (i % 3) * 0.2;
+    scene.add(at(home, x, y - 3, z));
+  }
+
+  // Starwatch Observatory on the hill: a white hall with a big bronze dome, two small ones and a lawn with an obelisk
+  // (an original nod to the city's famous observatory).
+  {
+    const ox = 660, oz = 10, oy = hillHeight(ox, oz) - 6;
+    const obs = new Group();
+    obs.add(at(new Mesh(new BoxGeometry(150, 4, 90), toon("#8FA552")), 0, 2, 20));
+    obs.add(at(new Mesh(new BoxGeometry(84, 20, 30), toon("#F7F4EE")), 0, 14, 0));
+    obs.add(at(new Mesh(new CylinderGeometry(19, 19, 10, 24), toon("#F7F4EE")), 0, 28, 0));
+    obs.add(at(new Mesh(new SphereGeometry(18, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), toon("#8C9196")), 0, 33, 0));
+    for (const sx of [-40, 40]) {
+      obs.add(at(new Mesh(new CylinderGeometry(9, 9, 8, 16), toon("#F7F4EE")), sx, 26, 0));
+      obs.add(at(new Mesh(new SphereGeometry(8.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), toon("#7A9A8E")), sx, 30, 0));
+    }
+    const obelisk = new Mesh(new CylinderGeometry(1.5, 4, 34, 4), toon("#F7F4EE"));
+    obs.add(at(obelisk, -36, 21, 42));
+    obs.add(at(new Mesh(new PlaneGeometry(10, 4), glow("#9FC3E0", "#FFD27A")), 0, 12, 15.2));
+    obs.rotation.y = 0.25;
+    scene.add(at(obs, ox, oy, oz));
+  }
+
+  // A broadcast mast on the ridge beside the letters, with a blinking light.
+  {
+    const mx = 560, mz = -110, my = hillHeight(mx, mz) - 4;
+    const mast = new Group();
+    for (let i = 0; i < 8; i++) {
+      const r = 3.2 - i * 0.3;
+      mast.add(at(new Mesh(new CylinderGeometry(r - 0.3, r, 14, 6), toon(i % 2 ? "#E8E4DC" : "#D9453B")), 0, 7 + i * 14, 0));
+    }
+    for (const y of [40, 72]) mast.add(at(new Mesh(new CylinderGeometry(5, 5, 1.5, 12), toon("#C7C7CC")), 0, y, 0));
+    mast.add(at(new Mesh(new SphereGeometry(2.4, 8, 6), glow("#E8483B", "#FF4D4D", true)), 0, 116, 0));
+    scene.add(at(mast, mx, my, mz));
   }
   {
     const c = document.createElement("canvas");
@@ -489,25 +604,30 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     for (let i = 0; i < n; i++) {
       const puff = new Group();
       for (let k = 0; k < 4; k++) puff.add(at(new Mesh(new IcosahedronGeometry(15 + k * 4, 1), cloudMat), k * 15 - 22, 6 + (k % 2) * 6, (k % 2) * 8));
-      const cx = x + 30 + ((i * 0.618) % 1) * (w - 60), cz = y + 40 + (((i * 0.382) + 0.15) % 1) * (h - 60);
+      // Canyon Heights' clouds keep to its eastern half, clear of the observatory on the ridge.
+      const left = d.id === "canyon-heights" ? w * 0.45 : 30;
+      const cx = x + left + ((i * 0.618) % 1) * (w - left - 30), cz = y + 40 + (((i * 0.382) + 0.15) % 1) * (h - 60);
       at(puff, cx, d.id === "canyon-heights" ? hillHeight(cx, cz) + 20 : 26, cz);
       districtGroup.add(puff);
       clouds.push({ o: puff, base: cx, phase: i * 1.7 });
     }
   }
   // The Pier District's sea.
-  scene.add(flat(480, 150, glow("#8FD0E6", "#14304A"), 660, 1225, 0.4));
-  scene.add(flat(480, 70, "#F3E3BE", 660, 1115, 0.35));
+  {
+    const [px, py, pw, ph] = DISTRICTS.find((d) => d.id === "pier")!.rect;
+    scene.add(flat(pw + 300, ph * 0.7 + 200, glow("#7FC4DE", "#14304A"), px + pw / 2 + 150, py + ph * 0.35 + ph * 0.35 + 100, 0.4));
+    scene.add(flat(pw + 300, ph * 0.3, "#F3E3BE", px + pw / 2 + 150, py + ph * 0.15, 0.35));
+  }
   scene.add(districtGroup);
 
   // ---- Lights ----
-  const hemi = new HemisphereLight("#CDE8FF", "#7BAA55", 1.5);
+  const hemi = new HemisphereLight("#CFE3F2", "#C9B27D", 1.5);
   const sun = new DirectionalLight("#FFF1D6", 2.4);
-  sun.position.set(BOARD.w / 2 - 520, 900, BOARD.h / 2 + 260);
-  sun.target.position.set(BOARD.w / 2, 0, BOARD.h / 2);
+  sun.position.set(MID.x - 560, 950, MID.y + 300);
+  sun.target.position.set(MID.x, 0, MID.y);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -1000, right: 1000, top: 1000, bottom: -1000, near: 10, far: 3500 });
+  Object.assign(sun.shadow.camera, { left: -1100, right: 1100, top: 1100, bottom: -1100, near: 10, far: 4000 });
   sun.shadow.bias = -0.0008;
   const ambient = new AmbientLight("#FFFFFF", 0.2);
   scene.add(hemi, sun, sun.target, ambient);
@@ -522,7 +642,7 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   // ---- Camera ----
   const camera = new OrthographicCamera(-1, 1, 1, -1, 1, 5000);
   let size = { w: 390, h: 780 };
-  let view: BoardView = { center: { x: BOARD.w / 2, y: BOARD.h / 2 }, scale: 1 };
+  let view: BoardView = { center: { ...MID }, scale: 1 };
   const tilt = (PITCH * Math.PI) / 180;
 
   function placeCamera() {
@@ -543,16 +663,17 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
 
   let night = false;
   // Grass, the hill and the trees darken at night too.
-  const greens = ["#7CC453", "#5FAE3E", "#79BE52", "#62A944", "#4FA635", "#3A8A2B"].map((c) => ({ mat: toon(c), day: toon(c).color.clone() }));
+  const greens = ["#7F9A4C", "#C2A065", "#CDAE73", "#6B7D3A", "#6B8A3A", "#5F8B3B", "#8FA552"].map((c) => ({ mat: toon(c), day: toon(c).color.clone() }));
   function applyNight() {
     for (const gl of glows) gl.mat.color.set(night ? gl.night : gl.day);
     for (const g of greens) g.mat.color.copy(g.day).multiplyScalar(night ? 0.32 : 1);
-    groundMat.color.set(night ? "#1F3326" : "#7CC453");
-    roadMat.color.set(night ? "#4A4238" : "#E8D3A2");
-    kerb.color.set(night ? "#3E3830" : "#D2BE90");
+    groundMat.color.set(night ? "#2B2A24" : "#C9B27D");
+    roadMat.color.set(night ? "#2E2C30" : "#8F8A86");
+    kerb.color.set(night ? "#3E3A36" : "#D8CDB8");
+    paving.color.set(night ? "#4A4640" : "#ECE4D4");
     cloudMat.color.set(night ? "#4A4258" : "#FFFFFF");
-    hemi.color.set(night ? "#4A5A8A" : "#CDE8FF");
-    hemi.groundColor.set(night ? "#1A1622" : "#7BAA55");
+    hemi.color.set(night ? "#4A5A8A" : "#CFE3F2");
+    hemi.groundColor.set(night ? "#1A1622" : "#C9B27D");
     hemi.intensity = night ? 0.9 : 1.5;
     sun.color.set(night ? "#8EA2D8" : "#FFF1D6");
     sun.intensity = night ? 0.5 : 2.4;
