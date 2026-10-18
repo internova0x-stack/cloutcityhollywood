@@ -1,22 +1,68 @@
 // The Echo Flats board as a 3D model in a bright mobile-strategy style (owner, Oct 17 and 18: 3D that still looks
-// illustrated, "Clash of Clans inspired"): a diagonal isometric camera, lush grass and paved paths, chunky buildings
-// with thick overhanging roofs in saturated colours, soft real shadows, bushy trees. Original models only; same layout
-// as the 2D board (lib/map/board.ts). A few gentle animations: drifting clouds, the dome's halo, flickering neon.
+// illustrated, "Clash of Clans inspired"), dressed as a Hollywood city (owner, Oct 18): paved blocks packed with
+// mid-rise buildings, palm-lined streets with street lamps and traffic, a walk of stars on Echo Boulevard, and a huge
+// hill across the back carrying the CLOUTWOOD letters. Original models only; the grid and the places keep the 2D
+// board's layout (lib/map/board.ts). Gentle animations: drifting clouds, the dome's halo, flickering neon.
 // One world unit is one board unit; x runs east and z runs south, like the board's x and y.
 
 import {
   AmbientLight, BoxGeometry, BufferGeometry, CanvasTexture, Color, ConeGeometry, CylinderGeometry,
   DirectionalLight, DoubleSide, Group, HemisphereLight, IcosahedronGeometry, Mesh, MeshBasicMaterial, MeshLambertMaterial,
-  Object3D, OrthographicCamera, PCFSoftShadowMap, PlaneGeometry, Scene, SphereGeometry, SRGBColorSpace,
+  InstancedMesh, Object3D, OrthographicCamera, PCFSoftShadowMap, PlaneGeometry, Scene, SphereGeometry, SRGBColorSpace,
   TorusGeometry, Vector3, WebGLRenderer, type Material,
 } from "three";
-import { BOARD, BUILDINGS, CLOUTWOOD, DISTRICTS, GRID, HALO_DOME, ROADS, type Building } from "../../lib/map/board.ts";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { BOARD, BUILDINGS, DISTRICTS, GRID, HALO_DOME, ROADS, SPOTS, type Building, type Spot } from "../../lib/map/board.ts";
 
 /** Buildings are deeper in 3D than their foreshortened 2D footprints. */
 const DEPTH = 1.5;
 /** The camera looks down at this angle (degrees above the ground), turned 45° so the grid reads as diamonds. */
 export const PITCH = 35;
-export const YAW = 45;
+/** Turned 30°: the grid still reads on the diagonal, and the hill stays across the back of the view. */
+export const YAW = 30;
+/** Each place's building moves to the front of its block, so the street is lined with buildings. */
+const FRONT_INSET = 12;
+/** The CLOUTWOOD letters on the big hill across the back (north) of the board. */
+const LETTERS = { x: 330, z: 214, y: 176, w: 460 };
+/** The hills behind the town: [centre x, centre z, radius x, height, radius z]. */
+const HILLS: [number, number, number, number, number][] = [
+  [400, 40, 330, 270, 205], [-60, 30, 260, 210, 190], [820, 20, 300, 240, 200], [1150, 40, 220, 170, 170],
+];
+
+/** The ground height of the hills at a point (0 on the flat). */
+function hillHeight(x: number, z: number): number {
+  let best = 0;
+  for (const [cx, cz, rx, h, rz] of HILLS) {
+    const k = 1 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2;
+    if (k > 0) best = Math.max(best, h * Math.sqrt(k));
+  }
+  return best;
+}
+
+/** Which grid block a building stands in. */
+function blockOf(b: Building) {
+  const col = GRID.cols.findIndex((c) => b.x >= c && b.x < c + GRID.block);
+  const row = GRID.rows.findIndex((r) => b.y >= r - 20 && b.y < r + GRID.block);
+  return { bx: GRID.cols[col], by: GRID.rows[row], col, row };
+}
+
+/** A place's building in the 3D city: at the front of its block and taller (houses stay low). */
+function cityBuilding(b: Building): Building {
+  const { by } = blockOf(b);
+  const lift = b.kind === "house" || b.kind === "bungalow" ? 1.15 : 1.75;
+  return { ...b, h: Math.round(b.h * lift), y: by + GRID.block - FRONT_INSET - b.d };
+}
+
+/** Where plates sit in 3D: on the pavement in front of each place, and on the hill for the letters. */
+export const SPOTS_3D: Spot[] = SPOTS.map((s) => {
+  const b = BUILDINGS.find((x) => x.place === s.id);
+  if (b) {
+    const { by } = blockOf(b);
+    return { id: s.id, x: b.x + b.w / 2, y: by + GRID.block - FRONT_INSET + 4 };
+  }
+  if (s.id === "cloutwood-sign") return { id: s.id, x: LETTERS.x, y: LETTERS.z + 60 };
+  return s;
+});
 const INK = "#3B2F35";
 
 export interface BoardView {
@@ -87,49 +133,100 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   const roadMat = toon("#E3CFA0");
   for (const [y, x1, x2] of ROADS.h) scene.add(flat(x2 - x1, ROADS.width, roadMat, (x1 + x2) / 2, y, 0.3));
   for (const [x, y1, y2] of ROADS.v) scene.add(flat(ROADS.width, y2 - y1, roadMat, x, (y1 + y2) / 2, 0.3));
-  // Each block: a raised sidewalk slab with a lawn inset.
+  // Each block: a raised pavement slab; Lookout Park keeps its grass, pond and a fountain.
   const kerb = toon("#CDB98C");
+  const paving = toon("#DCCFB6");
   GRID.rows.forEach((by, r) => GRID.cols.forEach((bx, c) => {
     const slab = new Mesh(new BoxGeometry(GRID.block, 3, GRID.block), kerb);
     scene.add(at(slab, bx + GRID.block / 2, 1.5, by + GRID.block / 2));
     const park = r === 0 && c === 0;
-    scene.add(flat(GRID.block - 16, GRID.block - 16, park ? "#5FAE3E" : "#7CC453", bx + GRID.block / 2, by + GRID.block / 2, 3.2));
+    scene.add(flat(GRID.block - 8, GRID.block - 8, park ? toon("#5FAE3E") : paving, bx + GRID.block / 2, by + GRID.block / 2, 3.2));
     if (park) {
-      scene.add(flat(52, 26, glow("#8FD0E6", "#1E3A55"), bx + 75, by + 80, 3.4));
+      scene.add(flat(52, 26, glow("#8FD0E6", "#1E3A55"), bx + 75, by + 92, 3.4));
+      scene.add(at(new Mesh(new CylinderGeometry(9, 11, 5, 16), kerb), bx + 75, 5.5, by + 48));
+      scene.add(at(new Mesh(new CylinderGeometry(2, 2, 10, 8), glow("#BFE6F2", "#6FA9C8")), bx + 75, 11, by + 48));
     }
   }));
+  // A walk of stars along both pavements of Echo Boulevard.
+  const star = glow("#E79AB5", "#C2557E");
+  for (const z of [GRID.rows[1] + GRID.block - 4, GRID.rows[2] + 4]) {
+    for (let x = GRID.cols[0] + 10; x < GRID.cols[2] + GRID.block; x += 22) {
+      const st = new Mesh(new CylinderGeometry(4, 4, 0.6, 5), star);
+      scene.add(at(st, x, 3.5, z));
+    }
+  }
 
-  // ---- Trees and palms ----
+  // ---- Trees, palms, street lamps and traffic (instanced, so a whole city stays cheap to draw) ----
   const leaf = toon("#4FA635"), leafDark = toon("#3A8A2B"), trunk = toon("#8A5A33");
-  const tree = (x: number, z: number) => {
-    const g = new Group();
-    g.add(at(new Mesh(new CylinderGeometry(1.4, 1.8, 8, 6), trunk), 0, 4, 0));
-    g.add(at(new Mesh(new IcosahedronGeometry(9, 1), leaf), 0, 15, 0));
-    g.add(at(new Mesh(new IcosahedronGeometry(6.5, 1), leafDark), 5, 11, 3));
-    g.add(at(new Mesh(new IcosahedronGeometry(6, 1), leaf), -5, 12, -2));
-    return at(g, x, 3, z);
-  };
-  const palm = (x: number, z: number) => {
-    const g = new Group();
-    g.add(at(new Mesh(new CylinderGeometry(1.1, 1.6, 26, 6), trunk), 0, 13, 0));
-    for (let i = 0; i < 6; i++) {
-      const frond = new Mesh(new ConeGeometry(2.6, 15, 4), leafDark);
-      frond.rotation.z = Math.PI / 2.4;
-      const holder = new Group();
-      holder.rotation.y = (i / 6) * Math.PI * 2;
-      holder.add(at(frond, 6, 24, 0));
-      g.add(holder);
-    }
-    return at(g, x, 3, z);
-  };
-  GRID.rows.forEach((by, r) => GRID.cols.forEach((bx) => {
-    const boulevard = r === 1 || r === 2;
-    for (const [tx, tz] of [[bx + 16, by + 22], [bx + GRID.block - 16, by + 22], [bx + 16, by + GRID.block - 14], [bx + GRID.block - 16, by + GRID.block - 14]]) {
-      const front = tz > by + 100;
-      if (boulevard && ((r === 1 && front) || (r === 2 && !front))) scene.add(palm(tx, tz));
-      else if (!front || r === 0) scene.add(tree(tx, tz));
-    }
+  type Spot3 = { x: number; y: number; z: number; ry?: number; s?: number };
+  function instanced(geo: BufferGeometry, mat: Material, spots: Spot3[], colors?: string[]): InstancedMesh {
+    const m = new InstancedMesh(geo, mat, spots.length);
+    const o = new Object3D();
+    spots.forEach((t, i) => {
+      o.position.set(t.x, t.y, t.z);
+      o.rotation.set(0, t.ry ?? 0, 0);
+      o.scale.setScalar(t.s ?? 1);
+      o.updateMatrix();
+      m.setMatrixAt(i, o.matrix);
+      if (colors) m.setColorAt(i, new Color(colors[i % colors.length]));
+    });
+    m.instanceMatrix.needsUpdate = true;
+    return m;
+  }
+  const trunkGeo = new CylinderGeometry(1.1, 1.6, 30, 6).translate(0, 15, 0);
+  const crownGeo = mergeGeometries(Array.from({ length: 7 }, (_, i) => {
+    const frond = new ConeGeometry(2.8, 17, 4);
+    frond.rotateZ(Math.PI / 2.3).translate(7, 29, 0).rotateY((i / 7) * Math.PI * 2);
+    return frond;
   }));
+  const bushGeo = mergeGeometries([
+    // Cylinders are indexed and icosahedrons aren't: merging needs them all the same.
+    new CylinderGeometry(1.4, 1.8, 8, 6).translate(0, 4, 0).toNonIndexed(),
+    new IcosahedronGeometry(9, 1).translate(0, 15, 0),
+    new IcosahedronGeometry(6.5, 1).translate(5, 11, 3),
+    new IcosahedronGeometry(6, 1).translate(-5, 12, -2),
+  ]);
+
+  // Palms line every street: three on each side of every block, set in from the kerb.
+  const palms: Spot3[] = [];
+  GRID.rows.forEach((by, r) => GRID.cols.forEach((bx, c) => {
+    const e = 6, B2 = GRID.block;
+    for (const t of [26, 75, 124]) {
+      palms.push({ x: bx + t, y: 3, z: by + e }, { x: bx + t, y: 3, z: by + B2 - e });
+      palms.push({ x: bx + e, y: 3, z: by + t }, { x: bx + B2 - e, y: 3, z: by + t });
+    }
+    void r;
+    void c;
+  }));
+  // Palms also run out along Echo Boulevard into the districts.
+  for (let x = 12; x < 160; x += 36) palms.push({ x, y: 0, z: 640 }, { x, y: 0, z: 680 });
+  for (let x = 742; x < 900; x += 36) palms.push({ x, y: 0, z: 640 }, { x, y: 0, z: 680 });
+  palms.forEach((p, i) => { p.ry = i * 1.3; p.s = 0.9 + ((i * 37) % 10) / 40; });
+  scene.add(instanced(trunkGeo, trunk, palms));
+  scene.add(instanced(crownGeo, leafDark, palms));
+
+  // Street lamps on every block corner.
+  const lamps: Spot3[] = [];
+  for (const by of GRID.rows) for (const bx of GRID.cols) {
+    for (const [dx, dz] of [[4, 4], [GRID.block - 4, 4], [4, GRID.block - 4], [GRID.block - 4, GRID.block - 4]]) lamps.push({ x: bx + dx, y: 3, z: by + dz });
+  }
+  scene.add(instanced(new CylinderGeometry(0.7, 0.9, 22, 6).translate(0, 11, 0), toon("#4A4A55"), lamps));
+  scene.add(instanced(new SphereGeometry(2.6, 8, 6).translate(0, 23, 0), glow("#F4F1E6", "#FFE29A"), lamps));
+
+  // Traffic: cars in both lanes of every street.
+  const cars: Spot3[] = [];
+  ROADS.h.forEach(([y, x1, x2], i) => {
+    for (let x = x1 + 40 + (i * 23) % 50; x < x2 - 20; x += 110) cars.push({ x, y: 0, z: y - 7, ry: Math.PI / 2 }, { x: x + 55, y: 0, z: y + 7, ry: -Math.PI / 2 });
+  });
+  ROADS.v.forEach(([x, y1, y2], i) => {
+    for (let y = y1 + 60 + (i * 31) % 50; y < y2 - 20; y += 150) cars.push({ x: x + 7, y: 0, z: y, ry: 0 }, { x: x - 7, y: 0, z: y + 70, ry: Math.PI });
+  });
+  const carGeo = mergeGeometries([new BoxGeometry(9, 5, 16).translate(0, 3.5, 0), new BoxGeometry(8, 4, 8).translate(0, 8, -1)]);
+  scene.add(instanced(carGeo, new MeshLambertMaterial({ color: "#FFFFFF" }), cars, ["#E8483B", "#F2C230", "#3E7FD6", "#FFFFFF", "#2E2A33", "#4CB36B", "#F08AB0"]));
+
+  // Bushy trees in Lookout Park.
+  const parkTrees: Spot3[] = [];
+  for (let i = 0; i < 6; i++) parkTrees.push({ x: GRID.cols[0] + 26 + (i % 3) * 48, y: 3, z: GRID.rows[0] + 26 + Math.floor(i / 3) * 34, s: 0.9 });
 
   // ---- Buildings ----
   /** A striped canvas texture (awnings). */
@@ -266,35 +363,93 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     // The board's footprint: front edge at b.y + b.d, depth D going back (north).
     return at(g, b.x + b.w / 2, 3, b.y + b.d - front);
   }
-  for (const b of BUILDINGS) scene.add(building(b));
+  for (const b of BUILDINGS) scene.add(building(cityBuilding(b)));
 
-  // ---- The CLOUTWOOD hill ----
-  const hill = new Mesh(new SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), toon("#79BE52"));
-  hill.scale.set(230, 70, 110);
-  scene.add(at(hill, CLOUTWOOD.x, 0, CLOUTWOOD.y + 10));
-  const hill2 = new Mesh(new SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), toon("#62A944"));
-  hill2.scale.set(130, 50, 80);
-  scene.add(at(hill2, CLOUTWOOD.x - 130, 0, CLOUTWOOD.y - 10));
-  for (let i = 0; i < 8; i++) scene.add(tree(CLOUTWOOD.x - 190 + i * 52, CLOUTWOOD.y + 88 + (i % 2) * 8));
+  // Mid-rise fillers behind each place make the blocks read as a city: two per block, with rooftop details.
+  const fillerColors = ["#E9D3B0", "#C9D6E3", "#E8B9A8", "#B7C9B0", "#F2E2C4", "#9FB3C8", "#D9C2E0", "#F0C9A0"];
+  function filler(x: number, z: number, w: number, d: number, h: number, seed: number) {
+    const g = new Group();
+    g.add(at(new Mesh(new BoxGeometry(w, h, d), toon(fillerColors[seed % fillerColors.length])), 0, h / 2, 0));
+    g.add(at(new Mesh(new BoxGeometry(w + 3, 4, d + 3), toon("#B8A684")), 0, h + 2, 0));
+    // Windows on the two faces the camera sees (south and east).
+    const cols = Math.max(2, Math.floor(w / 14)), rows = Math.max(2, Math.floor((h - 10) / 14));
+    for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
+      const lit = Math.abs(Math.sin((seed * 7 + r * 13 + k) * 12.9898) * 43758.5453 % 1) > 0.35;
+      g.add(at(new Mesh(new PlaneGeometry((w / cols) * 0.5, 7), glow("#9FC3E0", lit ? "#FFD27A" : "#2A2530")), -w / 2 + (w / cols) * (k + 0.5), 10 + r * 14, d / 2 + 0.4));
+    }
+    const sideCols = Math.max(2, Math.floor(d / 14));
+    for (let r = 0; r < rows; r++) for (let k = 0; k < sideCols; k++) {
+      const lit = Math.abs(Math.sin((seed * 11 + r * 17 + k) * 12.9898) * 43758.5453 % 1) > 0.35;
+      const pane = new Mesh(new PlaneGeometry((d / sideCols) * 0.5, 7), glow("#9FC3E0", lit ? "#FFD27A" : "#2A2530"));
+      pane.rotation.y = Math.PI / 2;
+      g.add(at(pane, w / 2 + 0.4, 10 + r * 14, -d / 2 + (d / sideCols) * (k + 0.5)));
+    }
+    // A rooftop detail: a water tower, air-conditioning units or a billboard.
+    const kind = seed % 3;
+    if (kind === 0) {
+      g.add(at(new Mesh(new CylinderGeometry(6, 6, 9, 10), toon("#9C6B44")), w / 4, h + 12, 0));
+      g.add(at(new Mesh(new ConeGeometry(6.5, 5, 10), toon("#7A5236")), w / 4, h + 19, 0));
+    } else if (kind === 1) {
+      for (const dx of [-8, 6]) g.add(at(new Mesh(new BoxGeometry(8, 5, 8), toon("#C7C7CC")), dx, h + 6.5, 0));
+    } else {
+      const board = new Mesh(new BoxGeometry(w * 0.8, 16, 2), glow(["#F2C230", "#E8483B", "#3E7FD6"][seed % 3], ["#FF2E88", "#2EC4FF", "#FFC21A"][seed % 3], true));
+      g.add(at(board, 0, h + 16, 0));
+      g.add(at(new Mesh(new BoxGeometry(2, 10, 2), toon("#4A4A55")), 0, h + 6, 0));
+    }
+    return at(g, x, 3, z);
+  }
+  GRID.rows.forEach((by, r) => GRID.cols.forEach((bx, c) => {
+    if (r === 0 && c === 0) return;
+    const seed = r * 3 + c;
+    // Kept lower than the places' buildings in front, so the venues stay the stars of each block.
+    const h1 = 42 + ((seed * 53) % 46), h2 = 38 + ((seed * 71) % 56);
+    scene.add(filler(bx + 36, by + 32, 58, 44, h1, seed));
+    scene.add(filler(bx + 112, by + 32, 58, 44, h2, seed + 5));
+  }));
+
+  // ---- The hills across the back, with the CLOUTWOOD letters and a few hillside homes ----
+  HILLS.forEach(([cx, cz, rx, h, rz], i) => {
+    const hill = new Mesh(new SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), toon(i % 2 ? "#62A944" : "#79BE52"));
+    hill.scale.set(rx, h, rz);
+    scene.add(at(hill, cx, 0, cz));
+  });
+  const hillTrees: Spot3[] = [];
+  for (let i = 0; i < 70; i++) {
+    const x = -150 + ((i * 97) % 1250), z = -40 + ((i * 53) % 230);
+    const y = hillHeight(x, z);
+    if (y > 20 && !(Math.abs(x - LETTERS.x) < LETTERS.w / 2 + 10 && z > 170)) hillTrees.push({ x, y: y - 2, z, ry: i, s: 0.8 + (i % 4) * 0.15 });
+  }
+  scene.add(instanced(bushGeo, leaf, [...hillTrees, ...parkTrees]));
+  // Hillside homes, high above the city.
+  for (let i = 0; i < 7; i++) {
+    const x = 60 + i * 125, z = 120 + (i % 2) * 40;
+    const y = hillHeight(x, z);
+    if (y < 30 || Math.abs(x - LETTERS.x) < LETTERS.w / 2) continue;
+    const home = new Group();
+    home.add(at(new Mesh(new BoxGeometry(26, 14, 20), toon("#FFF6E8")), 0, 7, 0));
+    home.add(at(new Mesh(new BoxGeometry(30, 4, 24), toon("#D9453B")), 0, 16, 0));
+    home.add(at(new Mesh(new PlaneGeometry(12, 6), glow("#8FD0E6", "#FFD27A")), 0, 7, 10.2));
+    scene.add(at(home, x, y - 4, z));
+  }
   {
     const c = document.createElement("canvas");
     c.width = 1024;
     c.height = 160;
     const x = c.getContext("2d")!;
-    x.font = "900 120px 'Arial Black', Arial, sans-serif";
+    x.font = "900 128px 'Arial Black', Arial, sans-serif";
     x.textAlign = "center";
     x.textBaseline = "middle";
-    x.lineWidth = 10;
-    x.strokeStyle = INK;
-    x.strokeText("CLOUTWOOD", 512, 84);
+    x.lineWidth = 8;
+    x.strokeStyle = "rgba(59,47,53,.55)";
+    x.strokeText("CLOUTWOOD", 512, 86);
     x.fillStyle = "#FFFFFF";
-    x.fillText("CLOUTWOOD", 512, 84);
+    x.fillText("CLOUTWOOD", 512, 86);
     const tex = new CanvasTexture(c);
     tex.colorSpace = SRGBColorSpace;
-    const letters = new Mesh(new PlaneGeometry(240, 37.5), new MeshBasicMaterial({ map: tex, transparent: true, side: DoubleSide }));
-    // Face the camera, which is turned by YAW.
-    letters.rotation.set(-0.35, (YAW * Math.PI) / 180, 0, "YXZ");
-    scene.add(at(letters, CLOUTWOOD.x, 86, CLOUTWOOD.y + 44));
+    const letters = new Mesh(new PlaneGeometry(LETTERS.w, LETTERS.w * 0.156), new MeshBasicMaterial({ map: tex, transparent: true, side: DoubleSide }));
+    // Lying back on the hill's south face, straight across it so no letter sinks into the slope.
+    letters.rotation.x = -0.5;
+    scene.add(at(letters, LETTERS.x, LETTERS.y, LETTERS.z));
     glows.push({ mat: letters.material as MeshBasicMaterial, day: "#FFFFFF", night: "#FFF6E0" });
   }
 
@@ -323,8 +478,8 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   const sceneryMats = ["#E9C9A0", "#C25A4A", "#3A3345", "#D9D2C2", "#F4E6D0"];
   for (const d of DISTRICTS) {
     const [x, y, w, h] = d.rect;
-    // A few landmark blocks that poke through the clouds.
-    for (let i = 0; i < 4; i++) {
+    // A few landmark blocks that poke through the clouds (Canyon Heights is up in the hills already).
+    for (let i = 0; i < (d.id === "canyon-heights" ? 0 : 4); i++) {
       const bw = 36 + (i % 2) * 14, bh = 50 + ((i * 37) % 70);
       const m = inked(new BoxGeometry(bw, bh, bw), toon(sceneryMats[(i + d.id.length) % sceneryMats.length]));
       districtGroup.add(at(m, x + w * (0.2 + 0.2 * i), bh / 2, y + h * (0.3 + (i % 2) * 0.4)));
@@ -335,7 +490,7 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
       const puff = new Group();
       for (let k = 0; k < 4; k++) puff.add(at(new Mesh(new IcosahedronGeometry(15 + k * 4, 1), cloudMat), k * 15 - 22, 6 + (k % 2) * 6, (k % 2) * 8));
       const cx = x + 30 + ((i * 0.618) % 1) * (w - 60), cz = y + 40 + (((i * 0.382) + 0.15) % 1) * (h - 60);
-      at(puff, cx, 26, cz);
+      at(puff, cx, d.id === "canyon-heights" ? hillHeight(cx, cz) + 20 : 26, cz);
       districtGroup.add(puff);
       clouds.push({ o: puff, base: cx, phase: i * 1.7 });
     }
@@ -352,7 +507,7 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   sun.target.position.set(BOARD.w / 2, 0, BOARD.h / 2);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -900, right: 900, top: 900, bottom: -900, near: 10, far: 3000 });
+  Object.assign(sun.shadow.camera, { left: -1000, right: 1000, top: 1000, bottom: -1000, near: 10, far: 3500 });
   sun.shadow.bias = -0.0008;
   const ambient = new AmbientLight("#FFFFFF", 0.2);
   scene.add(hemi, sun, sun.target, ambient);
