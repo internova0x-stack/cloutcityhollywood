@@ -31,3 +31,12 @@ test("the board is dark at night and never uses gold", () => {
   assert.match(boardSvg("night"), /#25202D/);
   for (const theme of ["day", "night"] as const) assert.doesNotMatch(boardSvg(theme), /#(FEF3C0|E1BC85|AD8759|7E5932)/i);
 });
+
+test("every place has a spot in the 3D city, inside the city", async () => {
+  const { BOUNDS, SPOTS_3D } = await import("../components/map/board3d.ts");
+  for (const p of PLACE_PINS) {
+    const s = SPOTS_3D.find((x) => x.id === p.id);
+    assert.ok(s, `${p.id} has no 3D spot`);
+    assert.ok(s.x > BOUNDS.x0 && s.x < BOUNDS.x1 && s.y > BOUNDS.y0 && s.y < BOUNDS.y1, `${p.id} is outside the 3D city`);
+  }
+});

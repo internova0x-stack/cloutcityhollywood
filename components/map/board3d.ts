@@ -96,16 +96,19 @@ function cityBuilding(b: Building): Building {
   return { ...b, h: Math.round(b.h * lift), y: by + GRID.block - FRONT_INSET - b.d };
 }
 
-/** Where plates sit in 3D: on the pavement in front of each place, and on the hill for the letters. */
-export const SPOTS_3D: Spot[] = SPOTS.map((s) => {
+/** A 3D spot also knows its height: 0 on the street, up the hill for the letters. */
+export type Spot3D = Spot & { h: number };
+
+/** Where plates sit in 3D: on the pavement in front of each place, and on the hill just under the letters. */
+export const SPOTS_3D: Spot3D[] = SPOTS.map((s) => {
   const b = BUILDINGS.find((x) => x.place === s.id);
   if (b) {
     const { by } = blockOf(b);
-    return { id: s.id, x: b.x + b.w / 2, y: by + GRID.block - FRONT_INSET + 4 };
+    return { id: s.id, x: b.x + b.w / 2, y: by + GRID.block - FRONT_INSET + 4, h: 0 };
   }
-  if (s.id === "cloutwood-sign") return { id: s.id, x: LETTERS.x, y: LETTERS.z + 60 };
-  if (s.id === "halo-dome") return { id: s.id, x: HALO_DOME.x, y: HALO_DOME.y + 62 };
-  return s;
+  if (s.id === "cloutwood-sign") return { id: s.id, x: LETTERS.x, y: LETTERS.z, h: LETTERS.y - 70 };
+  if (s.id === "halo-dome") return { id: s.id, x: HALO_DOME.x, y: HALO_DOME.y + 62, h: 0 };
+  return { ...s, h: 0 };
 });
 const INK = "#3B2F35";
 

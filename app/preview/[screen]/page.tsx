@@ -46,7 +46,7 @@ export default async function Preview({
   if (process.env.NODE_ENV === "production") notFound();
   const { screen } = await params;
   const q = await searchParams;
-  if (screen === "guest") return <GuestMap invited={q.invited === "1"} forceTime={q.time === "day" || q.time === "night" ? q.time : undefined} />;
+  if (screen === "guest") return <GuestMap invited={q.invited === "1"} forceTime={q.time === "day" || q.time === "night" ? q.time : undefined} forceMap={q.map === "2d" || q.map === "3d" ? q.map : undefined} />;
   if (screen === "create") return <ClaimName claim={previewClaim} check={previewCheckName} askAge={q.age === "1"} />;
   if (screen === "home") {
     const n = Math.max(0, Math.min(FRIENDS.length, Number(q.crew ?? 2) || 0));

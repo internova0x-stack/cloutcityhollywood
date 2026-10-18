@@ -2092,6 +2092,11 @@ button.rank-chip::after { content:"›"; margin-left:2px; opacity:.6; }
 .imap-marquee i { display:block; height:3px; margin:-2px -5px 3px; background:radial-gradient(circle, var(--marquee-bulb) 0 1px, transparent 1.5px) 0 0/6px 3px; }
 .imap-marquee b { font:700 13px/15px var(--font-label); letter-spacing:.06em; text-transform:uppercase; }
 .imap-marquee span { font:500 10px/12px var(--font-ui); opacity:.75; }
+/* The 3D city (CityMap3D): the model on a canvas over a hazy Hollywood sky; labels are placed by transform. */
+.imap3d { background:linear-gradient(180deg,#A9CFEA,#D8E6EE 45%,#E9E4D6); }
+.imap3d.night { background:linear-gradient(180deg,#0E1A33,#1B2440 50%,#2B2A24); }
+.imap3d-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.imap3d .imap3d-label { left:0; top:0; will-change:transform; }
 .imap-zoom { position:absolute; z-index:21; right:max(12px, env(safe-area-inset-right,0px)); top:calc(156px + var(--safe-top)); width:40px; height:40px; border-radius:var(--r-pill); border:0; font:600 22px/1 var(--font-ui); color:var(--text-1); box-shadow:var(--elev-2); }
 @media (prefers-reduced-motion: reduce) {
   .imap-clouds { animation:none; }
