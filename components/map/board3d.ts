@@ -1,21 +1,22 @@
-// The Echo Flats board as a 3D model with an illustrated look (owner, Oct 17: 3D renderings that still look like an
-// illustration or animation). Same layout as the 2D board (lib/map/board.ts): the grid, the buildings, the hill,
-// the Halo Dome and the locked districts. Toon shading with three tone steps, dark "ink" outlines, pastel colours,
-// and a few gentle animations (drifting clouds, the dome's halo, flickering neon at night).
+// The Echo Flats board as a 3D model in a bright mobile-strategy style (owner, Oct 17 and 18: 3D that still looks
+// illustrated, "Clash of Clans inspired"): a diagonal isometric camera, lush grass and paved paths, chunky buildings
+// with thick overhanging roofs in saturated colours, soft real shadows, bushy trees. Original models only; same layout
+// as the 2D board (lib/map/board.ts). A few gentle animations: drifting clouds, the dome's halo, flickering neon.
 // One world unit is one board unit; x runs east and z runs south, like the board's x and y.
 
 import {
-  AmbientLight, BackSide, BoxGeometry, BufferGeometry, CanvasTexture, Color, ConeGeometry, CylinderGeometry, DataTexture,
-  DirectionalLight, DoubleSide, Group, HemisphereLight, IcosahedronGeometry, Mesh, MeshBasicMaterial, MeshToonMaterial,
-  NearestFilter, Object3D, OrthographicCamera, PlaneGeometry, RedFormat, Scene, SphereGeometry, SRGBColorSpace,
+  AmbientLight, BoxGeometry, BufferGeometry, CanvasTexture, Color, ConeGeometry, CylinderGeometry,
+  DirectionalLight, DoubleSide, Group, HemisphereLight, IcosahedronGeometry, Mesh, MeshBasicMaterial, MeshLambertMaterial,
+  Object3D, OrthographicCamera, PCFSoftShadowMap, PlaneGeometry, Scene, SphereGeometry, SRGBColorSpace,
   TorusGeometry, Vector3, WebGLRenderer, type Material,
 } from "three";
 import { BOARD, BUILDINGS, CLOUTWOOD, DISTRICTS, GRID, HALO_DOME, ROADS, type Building } from "../../lib/map/board.ts";
 
 /** Buildings are deeper in 3D than their foreshortened 2D footprints. */
 const DEPTH = 1.5;
-/** The camera looks down from the south at this angle (degrees above the ground). */
-const PITCH = 38;
+/** The camera looks down at this angle (degrees above the ground), turned 45° so the grid reads as diamonds. */
+export const PITCH = 35;
+export const YAW = 45;
 const INK = "#3B2F35";
 
 export interface BoardView {
@@ -36,29 +37,21 @@ export interface Board3D {
   dispose(): void;
 }
 
-/** Three hard tone steps: the "cel" look. */
-function toonRamp(): DataTexture {
-  const t = new DataTexture(new Uint8Array([90, 175, 255]), 3, 1, RedFormat);
-  t.minFilter = t.magFilter = NearestFilter;
-  t.needsUpdate = true;
-  return t;
-}
-
 export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "low-power" });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.outputColorSpace = SRGBColorSpace;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFSoftShadowMap;
   const scene = new Scene();
-  const ramp = toonRamp();
 
-  // ---- Materials, shared by colour ----
-  const toonCache = new Map<string, MeshToonMaterial>();
+  // ---- Materials, shared by colour: bright paint, a little more saturated than the 2D board's pastels ----
+  const toonCache = new Map<string, MeshLambertMaterial>();
   const toon = (color: string) => {
     let m = toonCache.get(color);
-    if (!m) toonCache.set(color, (m = new MeshToonMaterial({ color, gradientMap: ramp })));
+    if (!m) toonCache.set(color, (m = new MeshLambertMaterial({ color: new Color(color).offsetHSL(0, 0.14, 0) })));
     return m;
   };
-  const inkMat = new MeshBasicMaterial({ color: INK, side: BackSide });
   /** Things that glow at night (windows, signs, neon): plain colour, swapped between day and night. */
   const glows: { mat: MeshBasicMaterial; day: string; night: string; flicker?: boolean }[] = [];
   const glow = (day: string, night: string, flicker = false) => {
@@ -67,16 +60,10 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     return mat;
   };
 
-  /** A mesh with an ink outline: a slightly larger copy drawn inside-out behind it. */
-  function inked(geo: BufferGeometry, mat: Material, outline = 1.2): Group {
+  /** A mesh in a group (the style has no outlines; shadows give the shapes their edges). */
+  function inked(geo: BufferGeometry, mat: Material, _outline = 0): Group {
     const g = new Group();
     g.add(new Mesh(geo, mat));
-    const ink = new Mesh(geo, inkMat);
-    geo.computeBoundingBox();
-    const size = new Vector3();
-    geo.boundingBox!.getSize(size);
-    ink.scale.set(1 + (outline * 2) / Math.max(size.x, 1), 1 + (outline * 2) / Math.max(size.y, 1), 1 + (outline * 2) / Math.max(size.z, 1));
-    g.add(ink);
     return g;
   }
 
@@ -86,44 +73,40 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   };
 
   // ---- Ground, blocks and streets ----
-  const ground = new Mesh(new PlaneGeometry(BOARD.w, BOARD.h), toon("#EBDDC4"));
+  const ground = new Mesh(new PlaneGeometry(BOARD.w + 400, BOARD.h + 400), toon("#6FB548"));
   ground.rotation.x = -Math.PI / 2;
   at(ground, BOARD.w / 2, 0, BOARD.h / 2);
   scene.add(ground);
-  const groundMat = ground.material as MeshToonMaterial;
+  const groundMat = ground.material as MeshLambertMaterial;
 
   const flat = (w: number, d: number, color: string | Material, x: number, z: number, y = 0.2) => {
     const m = new Mesh(new PlaneGeometry(w, d), typeof color === "string" ? toon(color) : color);
     m.rotation.x = -Math.PI / 2;
     return at(m, x, y, z);
   };
-  const roadMat = toon("#CFC5B4");
+  const roadMat = toon("#E3CFA0");
   for (const [y, x1, x2] of ROADS.h) scene.add(flat(x2 - x1, ROADS.width, roadMat, (x1 + x2) / 2, y, 0.3));
   for (const [x, y1, y2] of ROADS.v) scene.add(flat(ROADS.width, y2 - y1, roadMat, x, (y1 + y2) / 2, 0.3));
-  // Dashed centre lines.
-  const dash = glow("#FFFFFF", "#8A7340");
-  for (const [y, x1, x2] of ROADS.h) for (let x = x1 + 6; x < x2; x += 20) scene.add(flat(10, 1.6, dash, x + 5, y, 0.5));
-  for (const [x, y1, y2] of ROADS.v) for (let y = y1 + 6; y < y2; y += 20) scene.add(flat(1.6, 10, dash, x, y + 5, 0.5));
-
   // Each block: a raised sidewalk slab with a lawn inset.
-  const kerb = toon("#F5EBD9");
+  const kerb = toon("#CDB98C");
   GRID.rows.forEach((by, r) => GRID.cols.forEach((bx, c) => {
     const slab = new Mesh(new BoxGeometry(GRID.block, 3, GRID.block), kerb);
     scene.add(at(slab, bx + GRID.block / 2, 1.5, by + GRID.block / 2));
     const park = r === 0 && c === 0;
-    scene.add(flat(GRID.block - 16, GRID.block - 16, park ? "#A9D18E" : "#E6D7BC", bx + GRID.block / 2, by + GRID.block / 2, 3.2));
+    scene.add(flat(GRID.block - 16, GRID.block - 16, park ? "#5FAE3E" : "#7CC453", bx + GRID.block / 2, by + GRID.block / 2, 3.2));
     if (park) {
       scene.add(flat(52, 26, glow("#8FD0E6", "#1E3A55"), bx + 75, by + 80, 3.4));
     }
   }));
 
   // ---- Trees and palms ----
-  const leaf = toon("#7DB86A"), leafDark = toon("#5E9A58"), trunk = toon("#9C7A54");
+  const leaf = toon("#4FA635"), leafDark = toon("#3A8A2B"), trunk = toon("#8A5A33");
   const tree = (x: number, z: number) => {
     const g = new Group();
     g.add(at(new Mesh(new CylinderGeometry(1.4, 1.8, 8, 6), trunk), 0, 4, 0));
-    g.add(at(inked(new IcosahedronGeometry(9, 0), leaf, 0.8), 0, 14, 0));
-    g.add(at(new Mesh(new IcosahedronGeometry(5, 0), leafDark), 4, 11, 3));
+    g.add(at(new Mesh(new IcosahedronGeometry(9, 1), leaf), 0, 15, 0));
+    g.add(at(new Mesh(new IcosahedronGeometry(6.5, 1), leafDark), 5, 11, 3));
+    g.add(at(new Mesh(new IcosahedronGeometry(6, 1), leaf), -5, 12, -2));
     return at(g, x, 3, z);
   };
   const palm = (x: number, z: number) => {
@@ -190,16 +173,27 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
       roof.rotation.z = Math.PI / 2;
       roof.rotation.x = Math.PI / 2;
       g.add(at(roof, 0, b.h + D * 0.28, 0));
+    } else if (b.kind === "club" || b.kind === "theater" || b.kind === "diner") {
+      // Flat roofs with a chunky parapet.
+      g.add(at(new Mesh(new BoxGeometry(b.w + 6, 6, D + 6), toon(b.roof)), 0, b.h + 3, 0));
     } else {
-      g.add(at(inked(new BoxGeometry(b.w + 4, 4, D + 4), toon(b.roof), 0.8), 0, b.h + 2, 0));
+      // A thick, overhanging hip roof: an eave slab and a four-sided pyramid.
+      g.add(at(new Mesh(new BoxGeometry(b.w + 12, 4, D + 12), toon(b.roof)), 0, b.h + 2, 0));
+      const rise = Math.min(b.w, D) * 0.42;
+      const hip = new Mesh(new ConeGeometry(Math.SQRT1_2, 1, 4, 1), toon(b.roof));
+      hip.rotation.y = Math.PI / 4;
+      hip.scale.set(b.w + 12, rise, D + 12);
+      g.add(at(hip, 0, b.h + 4 + rise / 2, 0));
     }
+    // A stone plinth along the bottom of the walls.
+    g.add(at(new Mesh(new BoxGeometry(b.w + 4, 6, D + 4), toon("#CDB98C")), 0, 3, 0));
     const door = glow("#5A4636", "#FFB347");
     const addDoor = (w = 12, h = 16) => g.add(at(new Mesh(new PlaneGeometry(w, h), door), 0, h / 2 + 1, front + 0.5));
 
     switch (b.kind) {
       case "cafe": {
         windows(g, b.w, b.h, front, 18, b.h - 4, b.x);
-        const awning = new Mesh(new BoxGeometry(b.w - 10, 2, 14), new MeshToonMaterial({ map: stripes("#E04E4E", "#FFF6E0"), gradientMap: ramp }));
+        const awning = new Mesh(new BoxGeometry(b.w - 10, 2, 14), new MeshLambertMaterial({ map: stripes("#E04E4E", "#FFF6E0") }));
         awning.rotation.x = 0.35;
         g.add(at(awning, 0, 18, front + 6));
         addDoor();
@@ -269,20 +263,16 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
         windows(g, b.w, b.h, front, 16, b.h - 4, b.x);
         addDoor();
     }
-    // A soft contact shadow under the building.
-    const shadow = new Mesh(new PlaneGeometry(b.w + 14, D + 14), new MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.12 }));
-    shadow.rotation.x = -Math.PI / 2;
-    g.add(at(shadow, 5, 0.1 - 2.9, 5));
     // The board's footprint: front edge at b.y + b.d, depth D going back (north).
     return at(g, b.x + b.w / 2, 3, b.y + b.d - front);
   }
   for (const b of BUILDINGS) scene.add(building(b));
 
   // ---- The CLOUTWOOD hill ----
-  const hill = new Mesh(new SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), toon("#A9CC8C"));
+  const hill = new Mesh(new SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), toon("#79BE52"));
   hill.scale.set(230, 70, 110);
   scene.add(at(hill, CLOUTWOOD.x, 0, CLOUTWOOD.y + 10));
-  const hill2 = new Mesh(new SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), toon("#8FBF76"));
+  const hill2 = new Mesh(new SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), toon("#62A944"));
   hill2.scale.set(130, 50, 80);
   scene.add(at(hill2, CLOUTWOOD.x - 130, 0, CLOUTWOOD.y - 10));
   for (let i = 0; i < 8; i++) scene.add(tree(CLOUTWOOD.x - 190 + i * 52, CLOUTWOOD.y + 88 + (i % 2) * 8));
@@ -302,7 +292,8 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     const tex = new CanvasTexture(c);
     tex.colorSpace = SRGBColorSpace;
     const letters = new Mesh(new PlaneGeometry(240, 37.5), new MeshBasicMaterial({ map: tex, transparent: true, side: DoubleSide }));
-    letters.rotation.x = -0.35;
+    // Face the camera, which is turned by YAW.
+    letters.rotation.set(-0.35, (YAW * Math.PI) / 180, 0, "YXZ");
     scene.add(at(letters, CLOUTWOOD.x, 86, CLOUTWOOD.y + 44));
     glows.push({ mat: letters.material as MeshBasicMaterial, day: "#FFFFFF", night: "#FFF6E0" });
   }
@@ -327,7 +318,7 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
 
   // ---- Locked districts: scenery under drifting low-poly clouds ----
   const districtGroup = new Group();
-  const cloudMat = new MeshToonMaterial({ color: "#FFFAF0", gradientMap: ramp, transparent: true, opacity: 0.94 });
+  const cloudMat = new MeshLambertMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.95 });
   const clouds: { o: Object3D; base: number; phase: number }[] = [];
   const sceneryMats = ["#E9C9A0", "#C25A4A", "#3A3345", "#D9D2C2", "#F4E6D0"];
   for (const d of DISTRICTS) {
@@ -339,12 +330,12 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
       districtGroup.add(at(m, x + w * (0.2 + 0.2 * i), bh / 2, y + h * (0.3 + (i % 2) * 0.4)));
     }
     // Clouds: clusters of chunky spheres covering the district.
-    const n = Math.max(3, Math.round((w * h) / 9000));
+    const n = Math.max(3, Math.round((w * h) / 7000));
     for (let i = 0; i < n; i++) {
       const puff = new Group();
-      for (let k = 0; k < 4; k++) puff.add(at(new Mesh(new IcosahedronGeometry(26 + k * 6, 1), cloudMat), k * 22 - 33, 8 + (k % 2) * 8, (k % 2) * 10));
+      for (let k = 0; k < 4; k++) puff.add(at(new Mesh(new IcosahedronGeometry(15 + k * 4, 1), cloudMat), k * 15 - 22, 6 + (k % 2) * 6, (k % 2) * 8));
       const cx = x + 30 + ((i * 0.618) % 1) * (w - 60), cz = y + 40 + (((i * 0.382) + 0.15) % 1) * (h - 60);
-      at(puff, cx, 34, cz);
+      at(puff, cx, 26, cz);
       districtGroup.add(puff);
       clouds.push({ o: puff, base: cx, phase: i * 1.7 });
     }
@@ -355,11 +346,23 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
   scene.add(districtGroup);
 
   // ---- Lights ----
-  const hemi = new HemisphereLight("#FFF4E6", "#B9A88E", 1.6);
-  const sun = new DirectionalLight("#FFF1DC", 1.8);
-  sun.position.set(-300, 500, 260);
-  const ambient = new AmbientLight("#FFFFFF", 0.25);
-  scene.add(hemi, sun, ambient);
+  const hemi = new HemisphereLight("#CDE8FF", "#7BAA55", 1.5);
+  const sun = new DirectionalLight("#FFF1D6", 2.4);
+  sun.position.set(BOARD.w / 2 - 520, 900, BOARD.h / 2 + 260);
+  sun.target.position.set(BOARD.w / 2, 0, BOARD.h / 2);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -900, right: 900, top: 900, bottom: -900, near: 10, far: 3000 });
+  sun.shadow.bias = -0.0008;
+  const ambient = new AmbientLight("#FFFFFF", 0.2);
+  scene.add(hemi, sun, sun.target, ambient);
+  // Everything casts and catches soft shadows, except the flat ground pieces, which only catch them.
+  scene.traverse((o) => {
+    if (!(o instanceof Mesh)) return;
+    const flatPiece = o.geometry instanceof PlaneGeometry;
+    o.castShadow = !flatPiece && o.material !== cloudMat;
+    o.receiveShadow = true;
+  });
 
   // ---- Camera ----
   const camera = new OrthographicCamera(-1, 1, 1, -1, 1, 5000);
@@ -377,23 +380,27 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     // Looking from the south and above. The board's y maps to z, foreshortened by the tilt, so the view
     // centre is found by sliding the target along z to keep scale consistent with the 2D board.
     const target = new Vector3(view.center.x, 0, view.center.y);
-    camera.position.set(target.x, target.y + Math.sin(tilt) * 1500, target.z + Math.cos(tilt) * 1500);
+    const yaw = (YAW * Math.PI) / 180;
+    camera.position.set(target.x + Math.sin(yaw) * Math.cos(tilt) * 1500, target.y + Math.sin(tilt) * 1500, target.z + Math.cos(yaw) * Math.cos(tilt) * 1500);
     camera.lookAt(target);
     camera.updateProjectionMatrix();
   }
 
   let night = false;
+  // Grass, the hill and the trees darken at night too.
+  const greens = ["#7CC453", "#5FAE3E", "#79BE52", "#62A944", "#4FA635", "#3A8A2B"].map((c) => ({ mat: toon(c), day: toon(c).color.clone() }));
   function applyNight() {
     for (const gl of glows) gl.mat.color.set(night ? gl.night : gl.day);
-    groundMat.color.set(night ? "#2A2433" : "#EBDDC4");
-    roadMat.color.set(night ? "#3A3342" : "#CFC5B4");
-    kerb.color.set(night ? "#332C3B" : "#F5EBD9");
-    cloudMat.color.set(night ? "#4A4258" : "#FFFAF0");
-    hemi.color.set(night ? "#4A5A8A" : "#FFF4E6");
-    hemi.groundColor.set(night ? "#1A1622" : "#B9A88E");
-    hemi.intensity = night ? 0.9 : 1.6;
-    sun.color.set(night ? "#8EA2D8" : "#FFF1DC");
-    sun.intensity = night ? 0.45 : 1.8;
+    for (const g of greens) g.mat.color.copy(g.day).multiplyScalar(night ? 0.32 : 1);
+    groundMat.color.set(night ? "#1F3326" : "#7CC453");
+    roadMat.color.set(night ? "#4A4238" : "#E8D3A2");
+    kerb.color.set(night ? "#3E3830" : "#D2BE90");
+    cloudMat.color.set(night ? "#4A4258" : "#FFFFFF");
+    hemi.color.set(night ? "#4A5A8A" : "#CDE8FF");
+    hemi.groundColor.set(night ? "#1A1622" : "#7BAA55");
+    hemi.intensity = night ? 0.9 : 1.5;
+    sun.color.set(night ? "#8EA2D8" : "#FFF1D6");
+    sun.intensity = night ? 0.5 : 2.4;
     renderer.setClearColor(new Color(night ? "#16233F" : "#FFE3CC"), 0);
   }
   applyNight();
