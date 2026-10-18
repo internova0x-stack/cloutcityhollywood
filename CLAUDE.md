@@ -41,8 +41,8 @@ music tabloid. Sister game to Clout City NYC (`internova0x-stack/project-clout-c
 - `npm run test:db`: every migration plus the SQL tests in `supabase/tests/` on a throwaway local Postgres.
 
 ## Stack
-Next.js, React, Supabase (auth + Postgres), Stripe, Vercel, MapLibre (real streets, as in Clout City NYC),
-three.js for avatars and landmarks, the Web Audio API for shows.
+Next.js, React, Supabase (auth + Postgres), Stripe, Vercel, the illustrated Echo Flats board (`lib/map/board.ts`,
+no map library), three.js for avatars, the Web Audio API for shows.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

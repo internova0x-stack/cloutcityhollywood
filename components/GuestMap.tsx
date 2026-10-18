@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { cityMinutes } from "@/lib/clock";
-import { PLACE_PINS, GUEST_START } from "@/lib/places";
-import { CityMap } from "./map/CityMap";
+import { PLACE_PINS } from "@/lib/places";
+import { CityMap3D } from "./CityMap3D";
+import { IllustratedMap } from "./IllustratedMap";
 import { SignUpSheet, type AuthMode } from "./SignUpSheet";
 
 /** Day runs 6 AM to 7:59 PM on the city clock (one day every 2 real hours). */
@@ -18,12 +19,35 @@ function cityTime(ms: number): string {
   return `${((h + 11) % 12) + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
+/** The 3D city needs WebGL; phones without it (or with data saver on) get the flat illustrated board. */
+function canRun3D(): boolean {
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  if (conn?.saveData) return false;
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") ?? c.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+
 /**
- * The guest map (Milestones v0.1; Clarifications 3): Echo Flats on real Echo Park and Silver Lake streets,
- * the four venues and three homes, the Halo Dome and the CLOUTWOOD letters in the Elysian Park hills, and
- * the locked districts under clouds. Any tap opens sign-up.
+ * The guest map (Milestones v0.1; Clarifications 3): the Echo Flats city in 3D (the illustrated 2D board where 3D can't run) with the four venues and
+ * three homes, the Halo Dome and the CLOUTWOOD hill, and the locked districts under clouds. Any tap opens sign-up.
  */
-export function GuestMap({ invited = false, authError = false, forceTime }: { invited?: boolean; authError?: boolean; forceTime?: "day" | "night" }) {
+export function GuestMap({
+  invited = false,
+  authError = false,
+  forceTime,
+  forceMap,
+}: {
+  invited?: boolean;
+  authError?: boolean;
+  forceTime?: "day" | "night";
+  forceMap?: "2d" | "3d";
+}) {
+  const [map, setMap] = useState<"2d" | "3d" | null>(null);
+  useEffect(() => setMap(forceMap ?? (canRun3D() ? "3d" : "2d")), [forceMap]);
   const [auth, setAuth] = useState<AuthMode | null>(invited ? "signup" : null);
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -36,17 +60,8 @@ export function GuestMap({ invited = false, authError = false, forceTime }: { in
 
   return (
     <main className="game">
-      <CityMap
-        pins={PLACE_PINS}
-        initialCenter={GUEST_START.at}
-        initialZoom={GUEST_START.zoom}
-        daytime={daytime}
-        onPinTap={signUp}
-        onLockedTap={signUp}
-        vehicles
-        attributionControl={false}
-        fitPins={{ top: 150, bottom: 300 }}
-      />
+      {map === "3d" && <CityMap3D places={PLACE_PINS} night={!daytime} onPlace={signUp} onDistrict={signUp} onTap={signUp} onFail={() => setMap("2d")} />}
+      {map === "2d" && <IllustratedMap places={PLACE_PINS} night={!daytime} onPlace={signUp} onDistrict={signUp} onTap={signUp} />}
 
       <div className="guest-top">
         <div className="guest-pills" aria-label="Echo Flats right now">
@@ -74,10 +89,6 @@ export function GuestMap({ invited = false, authError = false, forceTime }: { in
           </div>
           <p className="meta guest-foot">
             A parody · 18+ · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · No ad trackers
-            <br />
-            Map <a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a> ©{" "}
-            <a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a> ©{" "}
-            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>
           </p>
         </section>
       </div>
