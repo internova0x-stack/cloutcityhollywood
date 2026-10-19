@@ -234,10 +234,10 @@ export function CityMap3D({
             const s = spots.get(pl.id);
             if (!s) return null;
             if (zoom === "overview") {
-              // Tiles float above their building; the letters' tile floats above the letters so it never covers them.
+              // Tiles float above their building; the letters' tile sits on the slope below them so it never covers them.
               const sign = pl.id === "cloutwood-sign";
               return (
-                <button key={pl.id} ref={labelRef(pl.id, s.x, sign ? s.y : s.y - 50, sign ? s.h + 150 : 70)} data-place={pl.id} className={`imap3d-label imap-tile${pl.category === "venue" ? " venue" : ""}`} aria-label={pl.name}>
+                <button key={pl.id} ref={labelRef(pl.id, s.x, sign ? s.y + 10 : s.y - 50, sign ? s.h : 70)} data-place={pl.id} className={`imap3d-label imap-tile${pl.category === "venue" ? " venue" : ""}`} aria-label={pl.name}>
                   {pl.emoji}
                 </button>
               );

@@ -65,8 +65,6 @@ export const PITCH = 35;
 export const YAW = 30;
 /** Each place's building moves to the front of its block, so the street is lined with buildings. */
 const FRONT_INSET = 12;
-/** The CLOUTWOOD letters on the big hill across the back (north) of the board. */
-const LETTERS = { x: 330, z: 124, y: 176, w: 460 };
 /** The hills behind the town: [centre x, centre z, radius x, height, radius z]. */
 const HILLS: [number, number, number, number, number][] = [
   [400, -50, 330, 270, 205], [-60, -60, 260, 210, 190], [820, -70, 300, 240, 200], [1150, -50, 220, 170, 170],
@@ -81,6 +79,37 @@ function hillHeight(x: number, z: number): number {
   }
   return best;
 }
+
+/** The ground height the middle CLOUTWOOD letter stands at, on the big hill's south face. */
+const SIGN_H = 130;
+/** Letter size and spacing in board units. */
+const LETTER = { w: 46, h: 68, step: 50 };
+/**
+ * The CLOUTWOOD letters (owner, Oct 19: a hillside sign like the famous one): separate white block letters standing
+ * upright on legs, close together in one straight row across the view. Each letter slides up or down the slope until
+ * it lines up with the middle one on screen, so the row reads level while every letter stands on the ground.
+ * Original lettering, never the real sign's.
+ */
+const SIGN = (() => {
+  const yaw = (YAW * Math.PI) / 180, pitch = (PITCH * Math.PI) / 180;
+  const right = { x: Math.cos(yaw), z: -Math.sin(yaw) };
+  const away = { x: -Math.sin(yaw), z: -Math.cos(yaw) };
+  const base = { x: 300, z: 262 };
+  // How high a ground point t units up the view appears on screen.
+  const rise = (x: number, z: number, t: number) => hillHeight(x, z) * Math.cos(pitch) + t * Math.sin(pitch);
+  const walk = (o: number, stop: (x: number, z: number, t: number) => boolean) => {
+    for (let t = 0; t < 600; t += 1) {
+      const x = base.x + right.x * o + away.x * t, z = base.z + right.z * o + away.z * t;
+      if (stop(x, z, t)) return { x, z, y: hillHeight(x, z) };
+    }
+    return { x: base.x, z: base.z, y: 0 };
+  };
+  const mid = walk(0, (x, z) => hillHeight(x, z) >= SIGN_H);
+  const level = rise(mid.x, mid.z, Math.hypot(mid.x - base.x, mid.z - base.z));
+  return [..."CLOUTWOOD"].map((ch, i, all) => ({ ch, ...walk((i - (all.length - 1) / 2) * LETTER.step, (x, z, t) => rise(x, z, t) >= level) }));
+})();
+/** True just in front of the letters, where trees and homes would hide them. */
+const nearSign = (x: number, z: number) => SIGN.some((l) => Math.hypot(x - l.x, z - l.z) < 30 || (Math.abs(x - l.x) < 30 && z > l.z && z < l.z + 70));
 
 /** Which grid block a building stands in. */
 function blockOf(b: Building) {
@@ -106,7 +135,10 @@ export const SPOTS_3D: Spot3D[] = SPOTS.map((s) => {
     const { by } = blockOf(b);
     return { id: s.id, x: b.x + b.w / 2, y: by + GRID.block - FRONT_INSET + 4, h: 0 };
   }
-  if (s.id === "cloutwood-sign") return { id: s.id, x: LETTERS.x, y: LETTERS.z, h: LETTERS.y - 70 };
+  if (s.id === "cloutwood-sign") {
+    const mid = SIGN[4];
+    return { id: s.id, x: mid.x, y: mid.z + 30, h: hillHeight(mid.x, mid.z + 30) };
+  }
   if (s.id === "halo-dome") return { id: s.id, x: HALO_DOME.x, y: HALO_DOME.y + 62, h: 0 };
   return { ...s, h: 0 };
 });
@@ -492,20 +524,30 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     hill.scale.set(rx, h, rz);
     scene.add(at(hill, cx, 0, cz));
   });
-  const hillTrees: Spot3[] = [];
-  for (let i = 0; i < 90; i++) {
-    const x = -150 + ((i * 97) % 1250), z = -130 + ((i * 53) % 240);
-    const y = hillHeight(x, z);
-    if (y > 20 && !(Math.abs(x - LETTERS.x) < LETTERS.w / 2 + 10 && z > 170)) hillTrees.push({ x, y: y - 2, z, ry: i, s: 0.8 + (i % 4) * 0.15 });
+  // The hills are thick with trees in two greens, kept clear of the letters, the observatory and the mast.
+  const hillTrees: [Spot3[], Spot3[]] = [[], []];
+  const rand = (n: number) => {
+    const v = Math.sin(n * 127.1) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  for (let gx = -220, i = 0; gx < 1380; gx += 20) {
+    for (let gz = -250; gz < 200; gz += 18, i++) {
+      if (rand(i) > 0.62) continue;
+      const x = gx + (rand(i + 0.3) - 0.5) * 16, z = gz + (rand(i + 0.7) - 0.5) * 14;
+      const y = hillHeight(x, z);
+      if (y < 14 || nearSign(x, z) || Math.hypot(x - 660, z - 20) < 95 || Math.hypot(x - 560, z + 110) < 16) continue;
+      hillTrees[i % 3 ? 0 : 1].push({ x, y: y - 3, z, ry: i, s: 0.7 + rand(i + 0.5) * 0.6 });
+    }
   }
-  scene.add(instanced(bushGeo, toon("#6B7D3A"), hillTrees));
+  scene.add(instanced(bushGeo, toon("#6B7D3A"), hillTrees[0]));
+  scene.add(instanced(bushGeo, toon("#6B8A3A"), hillTrees[1]));
   scene.add(instanced(bushGeo, leaf, parkTrees));
   // Hillside homes, white stucco with terracotta roofs, stepping up the lower slopes.
   const homeWalls = ["#FFF6E8", "#F6E3CF", "#F3D6C6", "#EFE7D6"];
   for (let i = 0; i < 22; i++) {
     const x = -100 + ((i * 131) % 1150), z = 40 + ((i * 37) % 90);
     const y = hillHeight(x, z);
-    if (y < 12 || y > 150 || (Math.abs(x - LETTERS.x) < LETTERS.w / 2 + 10 && z < LETTERS.z + 50)) continue;
+    if (y < 12 || y > 150 || nearSign(x, z) || SIGN.some((l) => Math.abs(x - l.x) < 30 && Math.abs(z - l.z) < 30)) continue;
     const home = new Group();
     home.add(at(new Mesh(new BoxGeometry(26, 14, 20), toon(homeWalls[i % homeWalls.length])), 0, 7, 0));
     const roof = new Mesh(new ConeGeometry(Math.SQRT1_2, 1, 4, 1), toon("#C1583F"));
@@ -549,26 +591,45 @@ export function createBoard3D(canvas: HTMLCanvasElement): Board3D {
     mast.add(at(new Mesh(new SphereGeometry(2.4, 8, 6), glow("#E8483B", "#FF4D4D", true)), 0, 116, 0));
     scene.add(at(mast, mx, my, mz));
   }
+  // The CLOUTWOOD letters: each one a white face with a grey back for depth, on two legs and a crossbar, turned to
+  // face the town. They glow warm white at night.
   {
-    const c = document.createElement("canvas");
-    c.width = 1024;
-    c.height = 160;
-    const x = c.getContext("2d")!;
-    x.font = "900 128px 'Arial Black', Arial, sans-serif";
-    x.textAlign = "center";
-    x.textBaseline = "middle";
-    x.lineWidth = 8;
-    x.strokeStyle = "rgba(59,47,53,.55)";
-    x.strokeText("CLOUTWOOD", 512, 86);
-    x.fillStyle = "#FFFFFF";
-    x.fillText("CLOUTWOOD", 512, 86);
-    const tex = new CanvasTexture(c);
-    tex.colorSpace = SRGBColorSpace;
-    const letters = new Mesh(new PlaneGeometry(LETTERS.w, LETTERS.w * 0.156), new MeshBasicMaterial({ map: tex, transparent: true, side: DoubleSide }));
-    // Lying back on the hill's south face, straight across it so no letter sinks into the slope.
-    letters.rotation.x = -0.5;
-    scene.add(at(letters, LETTERS.x, LETTERS.y, LETTERS.z));
-    glows.push({ mat: letters.material as MeshBasicMaterial, day: "#FFFFFF", night: "#FFF6E0" });
+    const yaw = (YAW * Math.PI) / 180;
+    const legMat = toon("#6E6A66");
+    for (const l of SIGN) {
+      const c = document.createElement("canvas");
+      c.width = 128;
+      c.height = 192;
+      const x = c.getContext("2d")!;
+      x.fillStyle = x.strokeStyle = "#FFFFFF";
+      x.textAlign = "center";
+      x.textBaseline = "alphabetic";
+      // Tall, heavy block letters: any bold sans, thickened with a stroke so phones without heavy fonts match.
+      x.font = "bold 170px Arial, Helvetica, sans-serif";
+      x.lineWidth = 16;
+      x.lineJoin = "miter";
+      x.save();
+      x.translate(64, 178);
+      x.scale(0.72, 1.18);
+      x.strokeText(l.ch, 0, 0);
+      x.fillText(l.ch, 0, 0);
+      x.restore();
+      const tex = new CanvasTexture(c);
+      tex.colorSpace = SRGBColorSpace;
+      const plane = new PlaneGeometry(LETTER.w, LETTER.h);
+      const faceMat = new MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: DoubleSide });
+      glows.push({ mat: faceMat, day: "#FFFFFF", night: "#FFF6E0" });
+      const face = new Mesh(plane, faceMat);
+      const back = new Mesh(plane, new MeshBasicMaterial({ map: tex, color: "#A8A096", transparent: true, alphaTest: 0.5, side: DoubleSide }));
+      const g = new Group();
+      const mid = 12 + LETTER.h / 2;
+      g.add(at(face, 0, mid, 0));
+      g.add(at(back, 0, mid, -2.5));
+      for (const lx of [-12, 12]) g.add(at(new Mesh(new BoxGeometry(2, mid + 10, 2), legMat), lx, (mid + 10) / 2 - 10, -4));
+      g.add(at(new Mesh(new BoxGeometry(28, 1.6, 1.6), legMat), 0, mid - 10, -4));
+      g.rotation.y = yaw;
+      scene.add(at(g, l.x, l.y - 4, l.z));
+    }
   }
 
   // ---- The Halo Dome ----

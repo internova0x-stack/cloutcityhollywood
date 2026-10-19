@@ -47,7 +47,8 @@ decision: no real streets, no MapLibre.
   block set back from the street, with Echo Boulevard through the middle. Every name stays invented.
 - **The art** is a v0.1 placeholder generated in code (`lib/map/board.ts`, written to `public/map/` by
   `npm run gen:board`); real illustrated art replaces the two files later without code changes.
-- **Around the town**: the CLOUTWOOD hill above (original lettering, never the real sign), the Halo Dome on the far
+- **Around the town**: the CLOUTWOOD hill above (original lettering, never the real sign; owner, Oct 19: styled as a
+  hillside sign, separate white block letters standing on legs in a row across a tree-covered hill), the Halo Dome on the far
   edge (always lit, locked), and the locked districts under clouds: Starline Boulevard, Neon Row, Canyon Heights,
   the Studio Lot and the Pier District.
 - **Later**: decorative vehicles on the roads and the player's marker (C47).
